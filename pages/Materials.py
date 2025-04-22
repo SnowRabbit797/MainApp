@@ -3,8 +3,6 @@ from modules.zemi import z20250411
 
 st.set_page_config(page_title="ゼミ発表", layout="wide")
 
-st.title("🧪 ゼミ発表ページ")
-
 page = st.sidebar.selectbox(
     "ページを選択してください",
     ("4/11(第1回)", "4/25(第2回)"),
