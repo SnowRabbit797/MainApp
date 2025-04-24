@@ -44,11 +44,11 @@ st.markdown("---")
 
 #文字列の表示方法-----------------------------------------
 st.markdown("""
-    <h2>文字列の表示の仕方(st形式)</h2>
+    <h2>文字列の表示方法(st形式)</h2>
 """, unsafe_allow_html=True)
 
 st.markdown("""
-    st形式はstremlitにおいて基本となる書き方。
+    st形式はstremlitにおいて基本となる書き方です。
 """, unsafe_allow_html=True)
 
 st.markdown("""<h3>コードの例</h3>""", unsafe_allow_html=True)
@@ -63,3 +63,38 @@ st.markdown("""<h3>出力結果</h3>""", unsafe_allow_html=True)
 st.code("""
     Hello, World!
 """)
+st.markdown("---")
+
+
+#文字列の表示方法-----------------------------------------
+st.markdown("""
+    <h2>文字列の表示方法(Markdown形式)</h2>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    Markdown形式は、Markdown記法を使用して文字列を表示する方法です。
+    Markdownは、テキストを装飾するための軽量マークアップ言語です。
+""", unsafe_allow_html=True)
+
+st.markdown("""<h3>コードの例</h3>""", unsafe_allow_html=True)
+
+st.code('''
+    import streamlit as st
+
+    st.markdown("""
+        # 見出し大
+        ## 見出し中
+        ### 見出し小
+        **太字**
+        *斜体*
+    """)
+''')
+
+st.markdown("""
+    # 見出し大
+    ## 見出し中
+    ### 見出し小
+    **太字**<br>
+    *斜体*
+""", unsafe_allow_html=True)
+st.markdown("---")
