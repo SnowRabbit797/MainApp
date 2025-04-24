@@ -7,6 +7,7 @@ def main():
     st.title("テスト")
 
     if section == "はじめに":
+        st.image("data/image/image0411/250411_page-0001.jpg")
         st.markdown("### テスト")
 
     elif section == "2枚目":
