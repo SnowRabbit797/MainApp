@@ -58,11 +58,8 @@ st.code("""
 
     st.write("Hello, World!")
 """)
+st.write("Hello, World!")
 
-st.markdown("""<h3>出力結果</h3>""", unsafe_allow_html=True)
-st.code("""
-    Hello, World!
-""")
 st.markdown("---")
 
 
@@ -87,6 +84,7 @@ st.code('''
         ### 見出し小
         **太字**
         *斜体*
+        Hello World
     """)
 ''')
 
@@ -95,7 +93,8 @@ st.markdown("""
     ## 見出し中
     ### 見出し小
     **太字**<br>
-    *斜体*
+    *斜体*<br>
+    Hello World
 """, unsafe_allow_html=True)
 st.markdown("---")
 
