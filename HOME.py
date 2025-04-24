@@ -98,3 +98,9 @@ st.markdown("""
     *斜体*
 """, unsafe_allow_html=True)
 st.markdown("---")
+
+st.latex(r'a + ar + ar^2 + \cdots + ar^{n-1}')
+st.latex(r'= \sum_{k=0}^{n-1} ar^k')
+st.latex(r'= a \left( \frac{1 - r^n}{1 - r} \right)')
+
+
