@@ -4,30 +4,21 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 def main():
-    st.sidebar.title("25/04/25 ゼミ発表資料(テスト)")
-    section = st.sidebar.radio("目次", ["導入", "グラフの描画", "結論"])
+    st.sidebar.title("25/04/25 ゼミ発表資料")
+    section = st.sidebar.radio("目次", ["導入", "グラフの描画(脱線話)", "貪欲法", "結論"])
 
-    if section == "はじめに":
-        st.markdown("コードテスト")
-        
-        code = """
-        import streamlit as st
-        import pandas as pd
-        
-        print("Hello World")
-        
-        """
-        st.latex(r'''
-            a + ar + a r^2 + a r^3 + \cdots + a r^{n-1} =
-            \sum_{k=0}^{n-1} ar^k =
-            a \left(\frac{1-r^{n}}{1-r}\right)
-            ''')
-        
-        st.code(code, language="python")
+    if section == "導入":
+        st.title("2025年4月25日 M2ゼミ発表(2回目)")
+        st.image("data/image/image0425/250425_page-0001.jpg")
+        st.image("data/image/image0425/250425_page-0002.jpg")
+        st.image("data/image/image0425/250425_page-0003.jpg")
+        st.image("data/image/image0425/250425_page-0004.jpg")
+        st.image("data/image/image0425/250425_page-0005.jpg")
+        st.image("data/image/image0425/250425_page-0006.jpg")
         
     #----------------------------------------------------------
 
-    elif section == "グラフの描画":
+    elif section == "グラフの描画(脱線話)":
         csv_path = "assets/csv/mvcfSurugadai.csv"
         df = pd.read_csv(csv_path)
 
@@ -42,7 +33,7 @@ def main():
 
         # Streamlitで表示
         st.title("CSVから読み込んだグラフの描画")
-        st.write("今回使用するデータセット(D1)は以下の通り。")
+        st.write("今回使用するデータセット(D1)は先程の駿河台の地図を参考にした以下の通り。")
         st.code("""
             source,target
             1,2
@@ -68,10 +59,14 @@ def main():
             import networkx as nx         # グラフ（ノードとエッジ）を扱うライブラリ
             import matplotlib.pyplot as plt  # グラフを描画するライブラリ
         """)
+        st.markdown("---")
         st.write("""駿河台のグラフを参考に取ったデータ(D1)をグラフ表示した結果が以下の通り。
                 networkxライブラリを元に描画したため、割と綺麗に描画はできているが、元の駿河台のマップとは少し違う。""")
         st.pyplot(fig)
-
+        
+    #----------------------------------------------------------
+    elif section == "貪欲法":
+        st.write("テスト")
     elif section == "結論":
         st.write("テスト")
     
