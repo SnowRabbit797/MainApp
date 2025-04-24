@@ -205,8 +205,9 @@ def main():
             st.write(G)
         """)
         df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        edges = [(int(a), int(b)) for a, b in df.values]
         G = nx.Graph() 
-        G.add_edges_from(df.values) 
+        G.add_edges_from(edges) 
         st.write(G)
         #-----------------------------------------------------------
         st.markdown("---")
@@ -215,8 +216,9 @@ def main():
             st.write(G.edges())
         """)
         df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        edges = [(int(a), int(b)) for a, b in df.values]
         G = nx.Graph() 
-        G.add_edges_from(df.values) 
+        G.add_edges_from(edges) 
         st.write(G.edges())
         #-----------------------------------------------------------
         st.markdown("---")
@@ -225,8 +227,9 @@ def main():
             st.write(G.nodes())
         """)
         df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        edges = [(int(a), int(b)) for a, b in df.values]
         G = nx.Graph() 
-        G.add_edges_from(df.values) 
+        G.add_edges_from(edges) 
         st.write(G.nodes())
         st.write("エッジの情報しか入れていないのに、ノードの情報も自動的に取得できる。")
         #-----------------------------------------------------------
@@ -236,8 +239,9 @@ def main():
             st.write(G.degree())
         """)
         df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        edges = [(int(a), int(b)) for a, b in df.values]
         G = nx.Graph() 
-        G.add_edges_from(df.values) 
+        G.add_edges_from(edges) 
         st.write(G.degree())
         st.write("(1,2)であれば、頂点1には次数が2、(2,3)であれば、頂点2には次数が3つあることになる。")
     elif section == "次回は？":
