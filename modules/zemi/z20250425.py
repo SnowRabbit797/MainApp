@@ -6,11 +6,15 @@ import streamlit.components.v1 as components
 
 def main():
     st.sidebar.title("25/04/25 ゼミ発表資料")
-    section = st.sidebar.radio("目次", ["導入", "グラフの描画(脱線話)", "貪欲法", "結論"])
+    section = st.sidebar.radio("目次", ["導入", "グラフの描画(脱線話)", "貪欲法", "networkxの説明", "次回は？"])
 
     if section == "導入":
         st.title("2025年4月25日 M2ゼミ発表(2回目)")
         st.title("北村竜嗣様、御誕生日おめでとうございます。")
+        st.markdown("---")
+        st.write("""今回からstreamlitを使用して、ゼミ発表の資料を作成しています。今回はお試しとして色々な機能を試してみています。""")
+        st.write("まだversionは1.0なので、使いにくい部分もありますが、ご了承ください。")
+        st.markdown("---")
         st.image("data/image/image0425/250425_page-0001.jpg")
         st.image("data/image/image0425/250425_page-0002.jpg")
         st.image("data/image/image0425/250425_page-0003.jpg")
@@ -148,8 +152,101 @@ def main():
             <p>実装コードに関しては実装の順序に準じている。</p>
             <p>空のグラフを作成し、CSVからエッジを追加している。また、グラフのノードを全て選択肢に入れ、選択肢の中から最も多くのエッジをカバーするノードを選び、選んだノードをカバーセットに追加し、選択肢から削除している。</p>
             <p>ライブラリ：networkxを使用することで、グラフの描画やノードの選択肢の管理が容易になっている。</p>
-            <p>最後にライブラリ：networkxの説明だけしておく。</p>
+            <p>最後にライブラリ：networkxの説明だけしておきます。</p>
         """, unsafe_allow_html=True)
-    elif section == "結論":
-        st.write("テスト")
-    
+    elif section == "networkxの説明":
+        st.title("networkxの説明")
+        st.markdown("""
+            <h3><b>networkxとは</b></h3>
+            <p>networkxはPythonで書かれたグラフ理論のライブラリで、グラフの作成、操作、描画を簡単に行うことができる。ネットワーク解析やグラフアルゴリズムの実装に便利なツール。</p>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+            <h3><b>主な機能</b></h3>
+            <ul>
+                <li>グラフの作成：有向グラフ、無向グラフ、重み付きグラフなどを簡単に作成できる。</li>
+                <li>ノードとエッジの操作：ノードやエッジの追加、削除、属性の設定が可能。</li>
+                <li>アルゴリズム：最短経路探索、連結成分の検出、中心性の計算など、多くのアルゴリズムが実装されている。</li>
+                <li>描画：matplotlibを使用してグラフを描画することができる。</li>
+            </ul>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown("<h3>貪欲法で使用した例</h3>", unsafe_allow_html=True)
+        st.write("今回は以下のデータを使用した。どことどこが繋がっているか(エッジ)を示した単純なデータ。")
+        st.code("""
+            source,target
+            1,2
+            1,5
+            2,3
+            2,7
+            3,4
+            3,8
+            4,8
+            5,6
+            5,7
+            6,10
+            6,11
+            7,11
+            8,9
+            9,10
+            9,11
+        """)
+        st.markdown("<h3>まずはこのデータをコードでグラフとして保存する</h3>", unsafe_allow_html=True) 
+        st.code("""
+            df = pd.read_csv("なんとか.csv")
+            G = nx.Graph() 
+            G.add_edges_from(df.values)
+        """)
+        st.write("このようにしてグラフを作成することができる。空のグラフを作成し、CSVからエッジを追加している。") 
+        
+        #-----------------------------------------------------------
+        st.markdown("---")
+        st.markdown("<h3>グラフの詳細を見る</h3>", unsafe_allow_html=True)
+        st.code("""
+            st.write(G)
+        """)
+        df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        G = nx.Graph() 
+        G.add_edges_from(df.values) 
+        st.write(G)
+        #-----------------------------------------------------------
+        st.markdown("---")
+        st.markdown("<h3>グラフのエッジ(辺)</h3>", unsafe_allow_html=True)
+        st.code("""
+            st.write(G.edges())
+        """)
+        df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        G = nx.Graph() 
+        G.add_edges_from(df.values) 
+        st.write(G.edges())
+        #-----------------------------------------------------------
+        st.markdown("---")
+        st.markdown("<h3>グラフのノード(頂点)</h3>", unsafe_allow_html=True)
+        st.code("""
+            st.write(G.nodes())
+        """)
+        df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        G = nx.Graph() 
+        G.add_edges_from(df.values) 
+        st.write(G.nodes())
+        st.write("エッジの情報しか入れていないのに、ノードの情報も自動的に取得できる。")
+        #-----------------------------------------------------------
+        st.markdown("---")
+        st.markdown("<h3>各ノードの次数を取得するもの</h3>", unsafe_allow_html=True)
+        st.code("""
+            st.write(G.degree())
+        """)
+        df = pd.read_csv("assets/csv/mvcfSurugadai.csv")
+        G = nx.Graph() 
+        G.add_edges_from(df.values) 
+        st.write(G.degree())
+        st.write("(1,2)であれば、頂点1には次数が2、(2,3)であれば、頂点2には次数が3つあることになる。")
+    elif section == "次回は？":
+        st.title("次回は？")
+        st.markdown("""
+            <ul>
+                <li>もっと大きなデータセットを用意する</li>
+                <li>遺伝的アルゴリズム、粒子群最適化で実装してみる</li>
+                <li>？？</li>
+                <li>？？</li>
+            </ul>
+        """, unsafe_allow_html=True)
