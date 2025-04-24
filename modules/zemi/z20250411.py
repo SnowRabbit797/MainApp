@@ -4,7 +4,7 @@ def main():
     st.sidebar.title("25/04/11 ゼミ発表資料(テスト)")
     section = st.sidebar.radio("目次", ["はじめに", "2枚目", "結論"])
 
-    st.title("テスト")
+    st.title("2025年4月11日 M2ゼミ発表(1回目)")
 
     if section == "はじめに":
         st.image("data/image/image0411/250411_page-0001.jpg")

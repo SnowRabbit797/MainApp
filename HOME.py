@@ -3,21 +3,19 @@ import streamlit as st
 st.set_page_config(page_title="佐藤葵のStreamlit", layout="wide")
 
 st.markdown("""
-    <h1>2026年度ゼミ資料</h1>
+    <h1>2026年度ゼミ資料アプリ(ver1.0)</h1>
     <p>2026年度のゼミ資料をまとめたページです。このページは、Streamlitを使用して作成しています。</p>
     <p>Streamlitは、PythonでWebアプリケーションを簡単に作成できるライブラリです。</p>
-    <p>このページで以下にStreamlitの基本的な使い方を紹介します。</p>
+    <p>以下にStreamlitの基本的な使い方を紹介します。</p>
     <br>
-    <h3>ゼミの資料は画面左側のサイドバーから飛べます</h3>
+    <h3>ゼミの資料は画面左側のサイドバーから飛べます。</h3>
     <ul>
         <li>HOME：ホーム画面(streamlitの使い方等の紹介ページ)</li>
         <li>Materials：ゼミの資料置き場</li>
         <li>others：その他(作成中、データなどを入れる予定)</li>
     </ul>
     """, unsafe_allow_html=True)
-
 st.markdown("<br><br>", unsafe_allow_html=True)
-
 st.markdown("---")
 
 
