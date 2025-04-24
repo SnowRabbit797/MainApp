@@ -1,1 +1,6 @@
 # 必要ライブラリ一覧
+streamlit
+pandas
+matplotlib
+networkx
+numpy
