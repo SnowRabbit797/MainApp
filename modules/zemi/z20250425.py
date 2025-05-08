@@ -10,7 +10,6 @@ def main():
 
     if section == "導入":
         st.title("2025年4月25日 M2ゼミ発表(2回目)")
-        st.title("北村竜嗣様、御誕生日おめでとうございます。")
         st.markdown("---")
         st.write("""今回からstreamlitを使用して、ゼミ発表の資料を作成しています。今回はお試しとして色々な機能を試してみています。""")
         st.write("まだversionは1.0なので、使いにくい部分もありますが、ご了承ください。")
@@ -129,6 +128,8 @@ def main():
 
             while edges:
                 degree_node = max(graph.degree, key=lambda x: len([e for e in edges if x[0] in e]))
+                st.write(edges)
+                st.write(degree_node[0])
                 cover.add(degree_node[0])
                 edges = {e for e in edges if degree_node[0] not in e}
 
@@ -250,7 +251,7 @@ def main():
             <ul>
                 <li>もっと大きなデータセットを用意する</li>
                 <li>遺伝的アルゴリズム、粒子群最適化で実装してみる</li>
-                <li>？？</li>
-                <li>？？</li>
+                <li>バイナリ変数による整数計画法(バイナリ変数を用いず、線形計画法によって各変数の値を出し、そこで四捨五入。)</li>
+                <li></li>
             </ul>
         """, unsafe_allow_html=True)
