@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_navigation_bar import st_navbar
 
 st.set_page_config(page_title="ゼミ発表", layout="wide")
 
