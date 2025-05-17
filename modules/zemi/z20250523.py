@@ -4,64 +4,42 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
+from modules.algorithm import kenchoXY
 
 def main():
-    st.title("5月23日のゼミ発表")
+
+    st.markdown("""
+        <style>
+        .note-box {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+    """, unsafe_allow_html=True)
     
-    Array = np.loadtxt("assets/csv/admatrix.csv", delimiter=",")
-    G = nx.from_numpy_array(Array)
-    pos = {
-        0: (141.046879, 42.06431),
-        1: (140.740548, 40.824589),
-        2: (141.152696, 39.703526),
-        3: (140.872072, 38.268579),
-        4: (140.102381, 39.718626),
-        5: (140.36369, 38.240434),
-        6: (140.467771, 37.750029),
-        7: (140.446824, 36.341737),
-        8: (139.883592, 36.565912),
-        9: (139.060453, 36.390688),
-        10: (139.649012, 35.857033),
-        11: (140.123154, 35.60456),
-        12: (139.691722, 35.689501),
-        13: (139.642537, 35.447734),
-        14: (139.023245, 37.902451),
-        15: (137.211305, 36.695265),
-        16: (136.625669, 36.594606),
-        17: (136.22172, 36.065209),
-        18: (138.568455, 35.664108),
-        19: (138.180904, 36.651306),
-        20: (136.723657, 35.391174),
-        21: (138.383056, 34.976944),
-        22: (136.906582, 35.180209),
-        23: (136.508611, 34.730278),
-        24: (135.868568, 35.004513),
-        25: (135.755613, 35.021242),
-        26: (135.520037, 34.686344),
-        27: (135.183078, 34.691257),
-        28: (135.832861, 34.685274),
-        29: (135.1675, 34.226111),
-        30: (134.238261, 35.503449),
-        31: (133.05052, 35.472293),
-        32: (133.935032, 34.661739),
-        33: (132.459646, 34.396558),
-        34: (131.470654, 34.186041),
-        35: (134.559286, 34.065761),
-        36: (134.043291, 34.340112),
-        37: (132.765682, 33.841642),
-        38: (133.531111, 33.559722),
-        39: (130.417968, 33.606389),
-        40: (130.298792, 33.249351),
-        41: (129.867251, 32.75004),
-        42: (130.741584, 32.7898),
-        43: (131.612645, 33.23813),
-        44: (131.423887, 31.911034),
-        45: (130.558025, 31.560171),
-        46: (129.680922, 30.212445)
-    }
-    fig, ax = plt.subplots()
-    nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=30, font_size=3, ax=ax)
-    st.pyplot(fig)
+    #----------------------------------------------------------
+    st.title("5月23日(第3回)の発表")
+    
+    st.markdown("""
+        <div class="note-box">
+            <h2>タイトル</h2>
+            <hr>
+            <p>ここに内容を書きます。説明文や要点を記述できます。</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    with st.container(border = True):
+        Array = np.loadtxt("assets/csv/admatrix.csv", delimiter=",")
+        G = nx.from_numpy_array(Array)
+        pos = kenchoXY.kenchoXY()
+        fig, ax = plt.subplots()
+        nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=30, font_size=3, ax=ax)
+        st.pyplot(fig)
     
     
         

@@ -1,3 +1,5 @@
 import streamlit as st
 
-st.title("作成中")
+with st.container(border = True):
+    st.title("作成中")
+
