@@ -52,7 +52,7 @@ with st.container(border = True):
     st.markdown(r"""下記のグラフは与えられたグラフにおいて、選ばれたノード(赤)によって被覆されているエッジ(赤)を示している。""")
     col1, col2 = st.columns(2, border=True)
     with col1:
-        st.write("頂点被覆している例")
+        st.write("頂点被覆である例")
         G = nx.Graph()
         G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
         
@@ -89,7 +89,7 @@ with st.container(border = True):
         st.pyplot(fig)
 
     with col2:
-        st.write("頂点被覆していない例")
+        st.write("頂点被覆でない例")
         G = nx.Graph()
         G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
         
