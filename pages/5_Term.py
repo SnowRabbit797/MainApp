@@ -123,10 +123,9 @@ with st.container(border = True):
         fig, ax = plt.subplots()
         nx.draw(G, pos, with_labels=True, node_color=node_colors, edge_color=edge_colors, node_size=700, font_size=15, ax=ax)
         st.pyplot(fig)
-
-
-with st.container(border = True):
-    st.subheader("最小頂点被覆問題", divider="orange")
-    st.markdown(r"""与えられたグラフ
-                $$G=(V,E)$$について、$$G$$の頂点被覆のうち要素数が最小のものを求める問題
-                """)
+    
+    with st.container(border = True):
+        st.subheader("最小頂点被覆問題", divider="orange")
+        st.markdown(r"""与えられたグラフ
+                    $$G=(V,E)$$について、$$G$$の頂点被覆のうち要素数が最小のものを求める問題
+                    """)

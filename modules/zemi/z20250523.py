@@ -5,7 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
 from modules.algorithm import kenchoXY
-from pulp import LpMaximize, LpProblem, LpVariable, value
+from pulp import LpMaximize, LpProblem, LpVariable, value, LpMinimize, LpBinary, lpSum, LpStatus
 
 
 
@@ -40,8 +40,8 @@ def main():
         st.markdown("""
             <ol>
                 <li>前回の復習</li>
-                <li></li>
-                <li></li>
+                <li>整数計画法と線形計画法の導入</li>
+                <li>最小頂点被覆問題を整数計画法で解く</li>
                 <li></li>
             </ol>
         """, unsafe_allow_html=True)
@@ -78,7 +78,7 @@ def main():
     #----------------------------------------------------------
     st.markdown("""<br><br>""", unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("<h2>2. 整数計画法と線形計画法による最小頂点被覆問題の解法</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>2. 整数計画法と線形計画法の導入</h2>", unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -146,24 +146,160 @@ def main():
             st.code("""
                     from pulp import LpMaximize, LpProblem, LpVariable, value
                     
-                    z = LpProblem(sense=LpMaximize)
+                    prob = LpProblem(sense=LpMaximize)
                     p = LpVariable("p", lowBound=0)
                     q = LpVariable("q", lowBound=0)
-                    z += p + 2 * q
-                    z += p + 3 * q <= 30
-                    z += 2 * p + q <= 40
-                    z.solve()
+                    prob += p + 2 * q
+                    prob += p + 3 * q <= 30
+                    prob += 2 * p + q <= 40
+                    prob.solve()
             """)
-            z = LpProblem(sense=LpMaximize)
+            prob = LpProblem(sense=LpMaximize)
             p = LpVariable("p", lowBound=0)
             q = LpVariable("q", lowBound=0)
-            z += p + 2 * q
-            z += p + 3 * q <= 30
-            z += 2 * p + q <= 40
-            z.solve()
+            prob += p + 2 * q
+            prob += p + 3 * q <= 30
+            prob += 2 * p + q <= 40
+            prob.solve()
             st.write("製品pの量：", value(p), "kg")
             st.write("製品qの量：", value(q), "kg")
-                    
+            st.write("利得：", value(prob.objective), "万円")
+    st.markdown("""<br><br>""", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("<h2>3. 最小頂点被覆問題を整数計画法で解く。</h2>", unsafe_allow_html=True)
+    
+    with st.container(border = True):
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.container(border = True):
+                st.subheader("最小頂点被覆問題", divider="orange")
+                st.markdown(r"""与えられたグラフ$$G=(V,E)$$について、$$G$$の頂点被覆のうち要素数が最小のものを求める問題
+                            """, unsafe_allow_html=True)
+            st.markdown(r"""今回は右の図のグラフで考える。""", unsafe_allow_html=True)
+            st.markdown("""
+                        <ul>
+                            <li>ノードの数：4</li>
+                            <li>エッジの数：5</li>
+                        </ul>
+                        """, unsafe_allow_html=True)
+            with st.container(border = True):
+                st.subheader("考え方", divider="orange")
+                st.markdown(r"""<h4><b>STEP1.どれを選ぶか考える。(変数)</b></h4>""", unsafe_allow_html=True)
+                st.markdown(r"""頂点を選ぶかどうかを0-1変数(バイナリ変数)で表す。""")
+                st.markdown(r"""
+                    $x_i = \begin{cases}
+                    1 & \text{（頂点 } i \text{ をカバーに含めるとき）} \\
+                    0 & \text{（それ以外）}
+                    \end{cases}$
+                    """)
+                st.markdown(r"""<h4><b>STEP2.制約条件を考える。</b></h4>""", unsafe_allow_html=True)
+                st.markdown(r"""<h4><b>STEP3.目的関数を考える。</b></h4>""", unsafe_allow_html=True)
+        
+        
+        with col2:
+            G = nx.Graph()
+            G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
+
+            pos = {
+              1: (0, 0),
+              2: (1, 0),
+              3: (0, -1),
+              4: (1, -1)
+            }
+            fig, ax = plt.subplots()
+            nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=700, font_size=12, ax=ax)
+
+            st.pyplot(fig)
+            
+        col1, col2 = st.columns(2, border=True)
+        
+        with col1:
+            st.subheader("目的関数", divider="orange")
+            st.markdown(r"""この問題においては、選んだ頂点の数をできるだけ少なくすることが目的。
+                        <br>選んだ頂点の数をできるだけ少なくするためには、全ての頂点を選ぶ必要があるので、""", unsafe_allow_html=True)
+            st.markdown(r"""
+                    $$
+                    \min \sum_{i \in V} x_i
+                    $$
+                    """)
+            st.markdown(r"""となる。""", unsafe_allow_html=True)
+        with col2:
+            st.subheader("制約条件", divider="orange")
+            st.markdown(r"""どの辺$(u,v)$もどちらかの端点に含まれるようにする必要があるので、""")
+            st.markdown(r"""
+                    $$
+                    x_u + x_v \geq 1
+                    $$
+                    """)
+            st.markdown(r"""となる。$u,v$がどちらも選ばれていない場合は、$0+0$となるので、制約条件を満たさない。""", unsafe_allow_html=True)
+        
+        st.markdown("""<br><br>""", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""以上の情報からコードを組むと以下のようになる。ほぼ先ほどと同じ。""", unsafe_allow_html=True)
+            st.code("""
+                prob = LpProblem("Minimum_Vertex_Cover", LpMinimize)
+                x = {v: LpVariable(f"x_{v}", cat=LpBinary) for v in G.nodes}
+                prob += lpSum(x[v] for v in G.nodes)
+
+                for u, v in G.edges:
+                    prob += x[u] + x[v] >= 1
+
+                prob.solve()
+            """)
+            st.markdown("""<br>""", unsafe_allow_html=True)
+            st.write("実行ログ")
+            st.code("""
+                Result - Optimal solution found
+                Objective value:                2.00000000
+                Enumerated nodes:               0
+                Total iterations:               0
+                Time (CPU seconds):             0.00
+                Time (Wallclock seconds):       0.02
+                Option for printingOptions changed from normal to all
+                Total time (CPU seconds):       0.01   (Wallclock seconds):       0.02
+            """)
+            
+        with col2:
+            G = nx.Graph()
+            G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
+
+            pos = {
+              1: (0, 0),
+              2: (1, 0),
+              3: (0, -1),
+              4: (1, -1)
+            }
+
+            prob = LpProblem("Minimum_Vertex_Cover", LpMinimize)
+            x = {v: LpVariable(f"x_{v}", cat=LpBinary) for v in G.nodes}
+            prob += lpSum(x[v] for v in G.nodes)
+
+            for u, v in G.edges:
+                prob += x[u] + x[v] >= 1
+
+            prob.solve()
+
+
+            cover_nodes = [v for v in G.nodes if x[v].varValue == 1]
+            color_map = ['lightgreen' if node in cover_nodes else 'lightgray' for node in G.nodes]
+            fig, ax = plt.subplots()
+            nx.draw(G, pos, with_labels=True, node_color=color_map, edge_color='gray', node_size=800, font_size=14)
+            st.pyplot(fig)
+            
+        st.markdown("<h4>まとめ</h4>", unsafe_allow_html=True)
+        st.markdown("""実行ログやグラフから、頂点(1,4)を選べば最小頂点被覆になることがわかった。<br>
+                    また、計算時間は無視できるほどに高速で解けた。(この小ささのグラフなら当たり前...)<br>
+                    Time(Wallclock seconds)では、0.02秒となった。<br>
+                    Time(Wallclock seconds)とは、ファイルの読み書きやメモリの割り当て、streamlitの画面更新など、プログラムの実行開始から実行終了までに実際に経過した時間を表す。""", unsafe_allow_html=True)
+        
+    #----------------------------------------------------------
+    st.markdown("""<br><br>""", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("<h2>3. 最小頂点被覆問題を整数計画法で解く②</h2>", unsafe_allow_html=True)
+
+
+
 
 #----------------------------------------------------------
 
