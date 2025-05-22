@@ -297,7 +297,16 @@ def main():
     st.markdown("""<br><br>""", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("<h2>3. 最小頂点被覆問題を整数計画法で解く②</h2>", unsafe_allow_html=True)
-
+    with st.container(border = True):
+        st.subheader("目的関数", divider="orange")
+        st.markdown(r"""この問題においては、選んだ頂点の数をできるだけ少なくすることが目的。
+                    <br>選んだ頂点の数をできるだけ少なくするためには、全ての頂点を選ぶ必要があるので、""", unsafe_allow_html=True)
+        st.markdown(r"""
+                $$
+                \min \sum_{i \in V} x_i
+                $$
+                """)
+        st.markdown(r"""となる。""", unsafe_allow_html=True)
 
 
 
