@@ -11,7 +11,9 @@ st.markdown("""
     <h3>ゼミの資料は画面左側のサイドバーから飛べます。</h3>
     <ul>
         <li>HOME：ホーム画面(streamlitの使い方等の紹介ページ)</li>
-        <li>Materials：ゼミの資料置き場</li>
+        <li>Today's Materials：今日のゼミ資料</li>
+        <li>Materials Collection：ゼミの資料置き場</li>
+        <li>Dataset：過去に使用したデータの一覧</li>
         <li>others：その他(作成中、データなどを入れる予定)</li>
     </ul>
     """, unsafe_allow_html=True)
