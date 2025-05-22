@@ -96,7 +96,7 @@ def main():
     
     with st.container(border = True):
         st.subheader("整数計画法", divider="orange")
-        with st.expander("学部生時代に扱った簡単な問題"):
+        with st.expander("学部生時代に扱った簡単な問題。"):
             tab1, tab2 = st.tabs(["問題", "解答"])
             
             with tab1:
