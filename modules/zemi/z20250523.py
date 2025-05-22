@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import networkx as nx
+import time
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
 from modules.algorithm import kenchoXY
@@ -42,7 +43,7 @@ def main():
                 <li>前回の復習</li>
                 <li>整数計画法と線形計画法の導入</li>
                 <li>最小頂点被覆問題を整数計画法で解く</li>
-                <li></li>
+                <li>最小頂点被覆問題を整数計画法で解く②</li>
             </ol>
         """, unsafe_allow_html=True)
     #----------------------------------------------------------
@@ -296,57 +297,142 @@ def main():
     #----------------------------------------------------------
     st.markdown("""<br><br>""", unsafe_allow_html=True)
     st.markdown("---")
-    st.markdown("<h2>3. 最小頂点被覆問題を整数計画法で解く②</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>4. 最小頂点被覆問題を整数計画法で解く②</h2>", unsafe_allow_html=True)
+    st.markdown("今回は隣接行列で表した、日本地図のグラフについて整数計画法を適用してみる。", unsafe_allow_html=True)
     with st.container(border = True):
-        st.subheader("目的関数", divider="orange")
-        st.markdown(r"""この問題においては、選んだ頂点の数をできるだけ少なくすることが目的。
-                    <br>選んだ頂点の数をできるだけ少なくするためには、全ての頂点を選ぶ必要があるので、""", unsafe_allow_html=True)
-        st.markdown(r"""
-                $$
-                \min \sum_{i \in V} x_i
-                $$
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.container(border = True):
+                st.subheader("目的関数", divider="orange")
+                st.markdown(r"""この問題においては、選んだ頂点の数をできるだけ少なくすることが目的。
+                            <br>選んだ頂点の数をできるだけ少なくするためには、全ての頂点を選ぶ必要があるので、""", unsafe_allow_html=True)
+                st.markdown(r"""
+                        $$
+                        \min \sum_{i \in V} x_i
+                        $$
+                        """)
+                st.markdown(r"""となる。""", unsafe_allow_html=True)
+            with st.container(border = True):
+                st.subheader("制約条件", divider="orange")
+                st.markdown(r"""どの辺$(u,v)$もどちらかの端点に含まれるようにする必要があるので、""")
+                st.markdown(r"""
+                        $$
+                        x_u + x_v \geq 1
+                        $$
+                        """)
+                st.markdown(r"""となる。$u,v$がどちらも選ばれていない場合は、$0+0$となるので、制約条件を満たさない。""", unsafe_allow_html=True)
+            st.markdown("""
+                        <ul>
+                            <li>ノードの数：47</li>
+                            <li>エッジの数：91</li>
+                        </ul>
+                        """, unsafe_allow_html=True)
+        with col2:
+            Array = np.loadtxt("assets/csv/admatrix.csv", delimiter=",")
+            G = nx.from_numpy_array(Array)
+            pos = kenchoXY.kenchoXY()
+            fig, ax = plt.subplots()
+            nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=30, font_size=3, ax=ax)
+            st.pyplot(fig)
+        st.markdown("---")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""以上の情報からコードを組むと以下のようになる。""", unsafe_allow_html=True)
+            st.code("""
+                x = {v: LpVariable(f"x_{v}", cat=LpBinary) for v in G.nodes}
+                prob = LpProblem("MinVertexCover", LpMinimize)
+                prob += lpSum(x[v] for v in G.nodes)
+
+                for u, v in G.edges:
+                    prob += x[u] + x[v] >= 1
+
+                prob.solve()
                 """)
-        st.markdown(r"""となる。""", unsafe_allow_html=True)
-
-
-
-#----------------------------------------------------------
-
-
-# #pulp
-# m = LpProblem(sense=LpMaximize)  # 数理モデル
-# x = LpVariable("x", lowBound=0)  # 変数
-# y = LpVariable("y", lowBound=0)  # 変数
-# m += 100 * x + 100 * y  # 目的関数
-# m += x + 2 * y <= 16  # 材料Aの上限の制約条件
-# m += 3 * x + y <= 18  # 材料Bの上限の制約条件
-# m.solve()  # ソルバーの実行
-# st.write(value(x), value(y))  # 4.0 6.0
+            st.markdown("""
+                データの大きさが変わった程度なので、特にコードが変わらない。
+                <br>データの読み込み部と、グラフの描画部は省略している。(GitHub参照。)
+                """, unsafe_allow_html=True)
+            st.markdown("---")
+            st.code("""
+                Result - Optimal solution found
+                Objective value:                29.00000000
+                Enumerated nodes:               0
+                Total iterations:               0
+                Time (CPU seconds):             0.01
+                Time (Wallclock seconds):       0.01
+                Option for printingOptions changed from normal to all
+                Total time (CPU seconds):       0.01   (Wallclock seconds):       0.01
+                """)
+            st.markdown("結果、今回の47ノード91エッジの日本地図のグラフと、先ほどの4ノード5エッジのグラフとでは全く変わらない実行時間だった。", unsafe_allow_html=True)
             
+        with col2:
+            adj_matrix = np.loadtxt("assets/csv/admatrix.csv", delimiter=",")
+            G = nx.from_numpy_array(adj_matrix)
+
+            x = {v: LpVariable(f"x_{v}", cat=LpBinary) for v in G.nodes}
+            prob = LpProblem("MinVertexCover", LpMinimize)
+            prob += lpSum(x[v] for v in G.nodes)
+
+            for u, v in G.edges:
+                prob += x[u] + x[v] >= 1
+
+            prob.solve()
+            cover_nodes = [v for v in G.nodes if x[v].varValue == 1]
+
+            pos = kenchoXY.kenchoXY()
+            color_map = ['yellow' if node in cover_nodes else 'lightgray' for node in G.nodes]
+            labels = {i: str(i) for i in G.nodes} 
+
+            fig, ax = plt.subplots(figsize=(8, 10))
+            nx.draw(
+                G, pos, with_labels=True, labels=labels,
+                node_color=color_map, edge_color='gray',
+                node_size=300, font_size=8, ax=ax
+            )
+            st.pyplot(fig)
             
-            
-#適当なグラフ1
-# G = nx.Graph()
-# G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
+    #----------------------------------------------------------
+    st.markdown("""<br><br>""", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("<h2>5. 最小頂点被覆問題を整数計画法で解く③</h2>", unsafe_allow_html=True)
+    st.markdown("ノード数とエッジの密度を選択しグラフ生成を押すと、最小頂点被覆サイズとWallclock secondsを出力し、グラフを描画します。", unsafe_allow_html=True)
+    with st.container(border = True):
+        col1, col2 = st.columns(2)
+        with col1:
+            n_nodes = st.slider("ノード数", min_value=5, max_value=300, value=15, step=1)
+            edge_prob = st.slider("エッジの密度（確率）", min_value=0.20, max_value=1.0, value=0.3, step=0.05)
 
-# pos = {
-#   1: (0, 0),
-#   2: (1, 0),
-#   3: (0, -1),
-#   4: (1, -1)
-# }
-# fig, ax = plt.subplots()
-# nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=700, font_size=12, ax=ax)
+            if st.button("グラフを生成"):
+                G = nx.gnp_random_graph(n=n_nodes, p=edge_prob, seed=None)
 
-# st.pyplot(fig)
+                x = {v: LpVariable(f"x_{v}", cat=LpBinary) for v in G.nodes}
+                prob = LpProblem("Minimum_Vertex_Cover", LpMinimize)
+                prob += lpSum(x[v] for v in G.nodes)
+                for u, v in G.edges:
+                    prob += x[u] + x[v] >= 1
 
-#日本地図
-# with st.container(border = True):
-#     Array = np.loadtxt("assets/csv/admatrix.csv", delimiter=",")
-#     G = nx.from_numpy_array(Array)
-#     pos = kenchoXY.kenchoXY()
-#     fig, ax = plt.subplots()
-#     nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="gray", node_size=30, font_size=3, ax=ax)
-#     st.pyplot(fig)
+                start_time = time.time()
+                prob.solve()
+                end_time = time.time()
+                wallclock_seconds = round(end_time - start_time, 4)
 
-# st.markdown("---")
+                cover_nodes = [v for v in G.nodes if x[v].varValue == 1]
+
+                k = 1.5 / (n_nodes ** 0.5)
+                pos = nx.spring_layout(G, seed=42, k=k)
+                color_map = ['yellow' if v in cover_nodes else 'lightgray' for v in G.nodes]
+                node_size = int(8000 / n_nodes)
+                font_size = max(6, int(200 / n_nodes))
+
+                fig, ax = plt.subplots(figsize=(8, 6))
+                nx.draw(G, pos, with_labels=True, node_color=color_map, edge_color='gray',
+                        node_size=node_size, font_size=font_size, ax=ax)
+
+                st.markdown(f"- ノード数: **{n_nodes}**")
+                st.markdown(f"- エッジ数: **{G.number_of_edges()}**")
+                st.markdown(f"- 最小頂点被覆サイズ: **{len(cover_nodes)}**")
+                st.markdown(f"- Wallclock seconds: **{wallclock_seconds} 秒**")
+
+                with col2:
+                    st.pyplot(fig)
