@@ -95,16 +95,75 @@ def main():
     st.markdown("""<br>""", unsafe_allow_html=True)
     
     with st.container(border = True):
-        st.subheader("整数計画法", divider="orange")
-        with st.expander("学部生時代に扱った簡単な問題。"):
+        st.subheader("整数計画法の例", divider="orange")
+        with st.expander("学部生時代に扱った簡単な問題。学部生時代の資料をそのまま載っけているが、色々間違いだらけ。"):
             tab1, tab2 = st.tabs(["問題", "解答"])
             
             with tab1:
                 st.image("data/image/image0523/250523-01.jpg")
             with tab2:
                 st.image("data/image/image0523/250523-02.jpg")
-
-
+        st.markdown("""<br>""", unsafe_allow_html=True)
+        with st.container(border = True):
+            st.subheader("問題", divider="gray")
+            st.markdown(r"""ある工場では製品$$p,q$$を製造している。製品$$p,q$$を製造するには原料$$m,n$$が必要となる
+                        <br>以下の条件の時、利得を最大にするには製品$$p,q$$はそれぞれ何kg必要か。""", unsafe_allow_html=True)
+            st.markdown(r"""
+            - 製品 $p$ を 1kg 製造するのに原料 $m, n$ がそれぞれ 1kg, 2kg 必要  
+            - 製品 $q$ を 1kg 製造するのに原料 $m, n$ がそれぞれ 3kg, 1kg 必要  
+            - 原料 $m, n$ の在庫はそれぞれ 30kg, 40kg  
+            - 製品 $p, q$ の利得はそれぞれ 1万円, 2万円
+            """)
+        st.markdown("""<br>""", unsafe_allow_html=True)
+      
+        col1, col2 = st.columns(2, border=True)
+        with col1:
+            st.subheader("目的関数", divider="orange")
+            st.markdown(r"""<b>目的関数</b>とは、最適化問題において最小化または最大化する対象となる関数のこと。
+                        <br>この問題においては、製品$$p,q$$の利得を最大化することが目的である。
+                        <br>製品$$p$$を1kg作ると1万円、製品$$q$$を1kg作ると2万円の利得が得られるので、""", unsafe_allow_html=True)
+            st.markdown(r"""### 最大化：$$Z = p + 2q$$""")
+            st.markdown("となる。")
+        with col2:
+            st.subheader("制約条件", divider="orange")
+            with st.container(border = True):
+                st.subheader("制約条件1：非負制約(作る量は0以上)", divider="gray")
+                st.write(r"""製品$$p,q$$は非負である必要があるので、""")
+                st.latex(r"p \geq 0, \quad q \geq 0")
+            with st.container(border = True):
+                st.subheader("制約条件2：原料mの制約", divider="gray")
+                st.write(r"""製品$$p$$を1kg作るのに原料$$m$$が1kg必要、製品$$q$$を1kg作るのに原料$$m$$が3kg必要なので、""")
+                st.latex(r"p + 3q \leq 30 ")
+            with st.container(border = True):
+                st.subheader("制約条件3：原料nの制約", divider="gray")
+                st.write(r"""製品$$p$$を1kg作るのに原料$$n$$が2kg必要、製品$$q$$を1kg作るのに原料$$n$$が1kg必要なので、""")
+                st.latex(r"2p + q \leq 40 ")
+        st.markdown("""<br>""", unsafe_allow_html=True)
+        with st.container(border = True):
+            st.subheader("PythonのPulpライブラリを使用して作ってみる", divider="orange")
+            st.markdown(r"""<b>pulp</b>はPythonで線形計画法を解くためのライブラリで、数理最適化問題を簡単に定義し、めっちゃ楽に解くことができる。
+                        <br>以下のコードは、上記の問題をpulpライブラリを使用して解く例である。""", unsafe_allow_html=True)
+            st.code("""
+                    from pulp import LpMaximize, LpProblem, LpVariable, value
+                    
+                    z = LpProblem(sense=LpMaximize)
+                    p = LpVariable("p", lowBound=0)
+                    q = LpVariable("q", lowBound=0)
+                    z += p + 2 * q
+                    z += p + 3 * q <= 30
+                    z += 2 * p + q <= 40
+                    z.solve()
+            """)
+            z = LpProblem(sense=LpMaximize)
+            p = LpVariable("p", lowBound=0)
+            q = LpVariable("q", lowBound=0)
+            z += p + 2 * q
+            z += p + 3 * q <= 30
+            z += 2 * p + q <= 40
+            z.solve()
+            st.write("製品pの量：", value(p), "kg")
+            st.write("製品qの量：", value(q), "kg")
+                    
 
 #----------------------------------------------------------
 
