@@ -5,6 +5,46 @@ import matplotlib.pyplot as plt
 st.title(("今までに出てきた用語一覧"))
 
 with st.container(border = True):
+    
+    col1, col2 = st.columns(2, border=True)
+    
+    with col1:
+        st.subheader("ノード", divider="orange")
+        st.markdown(r"""頂点のこと。グラフ$$G=(V,E)$$においては$$V(vertices)$$の部分(下の図においての赤い点)。
+                    """)
+        G = nx.Graph()
+        G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
+        
+        pos = {
+          1: (0, 0),
+          2: (1, 0),
+          3: (0, -1),
+          4: (1, -1)
+        }
+        fig, ax = plt.subplots()
+        nx.draw(G, pos, with_labels=True, node_color="red", edge_color="lightblue", node_size=700, font_size=15, ax=ax)
+
+        st.pyplot(fig)
+    with col2:
+        st.subheader("エッジ", divider="orange")
+        st.markdown(r"""辺のこと。グラフ$$G=(V,E)$$においては$$E(edges)$$の部分(下の図においての赤い線)。
+                    """)
+        G = nx.Graph()
+        G.add_edges_from([(1, 2), (1, 3), (3, 4), (2, 4), (1, 4)])
+        
+        pos = {
+          1: (0, 0),
+          2: (1, 0),
+          3: (0, -1),
+          4: (1, -1)
+        }
+        fig, ax = plt.subplots()
+        nx.draw(G, pos, with_labels=True, node_color="lightblue", edge_color="red", node_size=700, font_size=15, ax=ax)
+
+        st.pyplot(fig)
+    
+
+with st.container(border = True):
     st.subheader("頂点被覆", divider="orange")
     st.markdown(r"""与えられたグラフ
                 $$G=(V,E)$$の頂点の部分集合を$$C$$とする。Eの全ての枝がCのいずれかの頂点と接続している(被覆している)とき、$$C$$を$$G$$の頂点被覆という。
