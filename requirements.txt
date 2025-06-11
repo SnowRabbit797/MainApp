@@ -6,3 +6,6 @@ networkx
 numpy
 pulp
 filelock
+streamlit-extras
+plotly
+streamlit-plotly-events

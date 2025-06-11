@@ -1,39 +1,41 @@
 import streamlit as st
-from filelock import FileLock, Timeout
+import pandas as pd
+import numpy as np
+import networkx as nx
 import time
+import matplotlib.pyplot as plt
+import streamlit.components.v1 as components
+from modules.algorithm import kenchoXY
+from pulp import LpMaximize, LpProblem, LpVariable, value, LpMinimize, LpBinary, lpSum, LpStatus
 
-lock_path = "demo.lock"
+st.markdown("<h2>5. 最小頂点被覆問題を整数計画法で解く③</h2>", unsafe_allow_html=True)
+st.markdown("ノード数とエッジの密度を選択しグラフ生成を押すと、最小頂点被覆サイズとWallclock secondsを出力し、グラフを描画します。", unsafe_allow_html=True)
 
-st.title("排他制御デモ")
+n_nodes = 5
+n_nodes_start = n_nodes
+n_nodes_end = 100
+edge_prob = 0.5
+wcs_list = []
 
-if st.button("処理を開始"):
-    st.write("[処理を開始]を押すと、10秒間擬似的な処理をしているようなプログラムが実行されます。")
-    try:
-        with FileLock(lock_path, timeout=1):
-            st.success("ロックを取得しました。処理中です...")
-            time.sleep(10)
-            st.success("処理が完了しました")
-    except Timeout:
-        st.warning("他のユーザーが現在処理中です。")
+if st.button("グラフを生成"):
+    while n_nodes <= n_nodes_end:
+        G = nx.gnp_random_graph(n=n_nodes, p=edge_prob, seed=None)
 
-with st.container(border = True):
-    st.subheader("コード", divider="orange")
-    st.code("""
-        import streamlit as st
-        from filelock import FileLock, Timeout
-        import time
+        x = {v: LpVariable(f"x_{v}", cat=LpBinary) for v in G.nodes}
+        prob = LpProblem("Minimum_Vertex_Cover", LpMinimize)
+        prob += lpSum(x[v] for v in G.nodes)
+        for u, v in G.edges:
+            prob += x[u] + x[v] >= 1
 
-        lock_path = "demo.lock"
+        start_time = time.time()
+        prob.solve()
+        end_time = time.time()
+        wallclock_seconds = round(end_time - start_time, 4)
+        wcs_list.append(wallclock_seconds)
 
-        st.title("排他制御デモ")
-
-        if st.button("処理を開始"):
-            st.write("[処理を開始]を押すと、10秒間擬似的な処理をしているようなプログラムが実行されます。")
-            try:
-                with FileLock(lock_path, timeout=1):
-                    st.success("ロックを取得しました。処理中です...")
-                    time.sleep(10)
-                    st.success("処理が完了しました")
-            except Timeout:
-                st.warning("他のユーザーが現在処理中です。")
-    """)
+        cover_nodes = [v for v in G.nodes if x[v].varValue == 1]
+        
+        st.write(f"ノード数: {n_nodes}, 最小頂点被覆サイズ: {len(cover_nodes)}, Wallclock seconds: {wallclock_seconds}")
+        n_nodes += 1
+    
+    st.line_chart(pd.Series(wcs_list, index=range(n_nodes_start , n_nodes_end+1)), use_container_width=True)
