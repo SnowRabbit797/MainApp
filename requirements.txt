@@ -10,3 +10,4 @@ streamlit-extras
 plotly
 streamlit-plotly-events
 japanize_matplotlib 
+scipy
