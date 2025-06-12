@@ -1,4 +1,5 @@
 import streamlit as st
+st.set_page_config(page_title="ゼミの資料アプリ", layout="wide")
 import networkx as nx
 import matplotlib.pyplot as plt
 
