@@ -6,7 +6,7 @@ import japanize_matplotlib
 import matplotlib.font_manager as fm
 
 POP_SIZE = 100
-N_GENERATIONS = 1000
+N_GENERATIONS = 500
 ELITE_SIZE = 10
 NUM_RANDOM = 15
 # ALPHA = 10
