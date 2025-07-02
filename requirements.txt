@@ -11,3 +11,5 @@ plotly
 streamlit-plotly-events
 japanize_matplotlib 
 scipy
+gspread
+google-auth
