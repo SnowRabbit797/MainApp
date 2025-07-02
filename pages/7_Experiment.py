@@ -14,47 +14,64 @@ client = gspread.authorize(credentials)
 SPREADSHEET_ID = "1dNzJx9smj9YiXool8n3UEIB_B_V4xVI2Z0ON8XUjkwc"
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
-def displayIL():
-  
-  
-  pass
 
-
-st.title("アイディアメモ")
-
+def displayIL(category: str):
+    if len(mat) <= 1:
+        st.info("まだアイディアはありません。")
+    else:
+        count = 0
+        for i, row in enumerate(mat[1:], start=1): 
+            if row[1] == category:
+                count += 1
+                st.markdown(f"・{row[2]} （{row[0]}）")
+        if count == 0:
+            st.info("このカテゴリにはまだアイディアがありません。")
+            
+            
 with st.container(border=True):
-  st.subheader("アイディアの追加")
-  idea = st.text_area("↓新しいアイディアを入力してください")
-  category = st.selectbox("カテゴリを選んでください", ["IL:初期個体群", "IL:交叉と突然変異", "IL:貪欲補正", "IL:その他"])
+  st.subheader("アイディアの追加", divider="gray")
+
+  with st.form(key="idea_form", clear_on_submit=True, border=True):
+      idea = st.text_area("①新しいアイディアを入力してください")
+
+      selected = st.multiselect(
+          "②カテゴリを選択してください。",
+          ["IL:初期個体群", "IL:交叉と突然変異", "IL:貪欲補正", "IL:その他"],
+      )
+      submitted = st.form_submit_button("＋ 追加")
+
+      if submitted:
+          if not idea.strip():
+              st.warning("⚠ 空のアイディアは追加できません")
+          elif not selected:
+              st.warning("⚠ カテゴリを選択してください")
+          else:
+              now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+              for cat in selected:
+                  sheet.append_row([now, cat, idea.strip()])
+              st.success("アイディアリストに追加しました。")
 
 
-  if st.button("＋ 追加"):
-      if idea.strip():
-          now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-          sheet.append_row([now, idea.strip()])
-          st.success("スプレッドシートに追加しました！")
-          st.rerun()
-      else:
-          st.warning("⚠ 空のアイディアは追加できません")
-
+st.markdown("---")
 # --- UI：一覧表示 ---
 st.subheader("登録済みアイディア一覧")
 
-rows = sheet.get_all_values()
+mat = sheet.get_all_values()
+
 
 tab1, tab2, tab3, tab4 = st.tabs(["IL:初期個体群", "IL:交叉と突然変異", "IL:貪欲補正", "IL:その他"])
 
 with tab1:
-  st.write("これはたぶ１です。")
+  displayIL("IL:初期個体群")
   
 with tab2:
-  st.write("これはたぶ２です。")
+  displayIL("IL:交叉と突然変異")
   
 with tab3:
-  st.write("これはたぶ３です。")
+  displayIL("IL:貪欲補正")
 
 with tab4:
-  st.write("これはたぶ４です。")
+  displayIL("IL:その他")
 
 
 
