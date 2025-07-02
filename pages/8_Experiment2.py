@@ -9,6 +9,9 @@ POP_SIZE = 100
 N_GENERATIONS = 500
 ELITE_SIZE = 10
 NUM_RANDOM = 15
+# C_max = None
+# C_min = None
+# b = C_min/C_max
 # ALPHA = 10
 # BETA = 1
 MUTATION_RATE = 0.01
@@ -24,6 +27,8 @@ num_nodes = 800
 
 def init_population(pop_size, num_nodes):
     return [[random.randint(0, 1) for _ in range(num_nodes)] for _ in range(pop_size)]
+  
+
 
 def evaluate_fitness(individual, edge_list):
     covered_edges = sum(1 for u, v in edge_list if individual[u] == 1 or individual[v] == 1)
@@ -74,7 +79,6 @@ def mutate(individual, mutation_rate=MUTATION_RATE):
 def run_ga():
     population = init_population(POP_SIZE, num_nodes)
     best_individual_history = []
-    min_valid_node_counts = []
     node_history = []
 
     for _ in range(N_GENERATIONS):

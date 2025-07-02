@@ -1,2 +1,12 @@
+# macOS
 .DS_Store
-modules/zemi/__pycache__/z20250411.cpython-310.pyc
+
+# Pythonのキャッシュ
+__pycache__/
+*.py[cod]
+
+# Streamlitのシークレット
+.streamlit/secrets.toml
+
+# サービスアカウントの認証情報（例: credentials.json）
+credentials.json
