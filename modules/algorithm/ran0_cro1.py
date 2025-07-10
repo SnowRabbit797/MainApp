@@ -11,12 +11,12 @@ df = pd.read_csv(file_path, skiprows=3)
 G = nx.from_pandas_edgelist(df, source="from", target="to", edge_attr="weight")
 pos = nx.spring_layout(G, k=0.1, seed=7)
 
-st.write(list(G.nodes()))
+st.write(G)
 
 #各種設定
 nodeNum = len(G.nodes()) #ノード数=遺伝子数
-popSize = 100 #個体数
-gengeration = 100 #世代数
+popSize = 1000 #個体数
+gengeration = 1000 #世代数
 mutationRate = 0 #突然変異率
 
 #初期個体群の生成(ランダムx100体)
@@ -75,64 +75,12 @@ def pointCrossover(evaPopList):
     
     return child1, child2
 
-def greedyCorrection(individual, G): #individualは0と1のリストで表されている
-    individual = individual.copy()
-    node = list(G.nodes())
-    
-    covered_edges = set()
-    #現在カバーされている辺を covered_edges に入れる
-    for i, bit in enumerate(individual):
-        if bit == 1:
-            u = node[i]
-            for v in G.neighbors(u):
-                covered_edges.add(tuple(sorted((u, v))))
-
-    #カバーされていない辺を見つける
-    uncovered_edges = []
-    for e in G.edges():
-        edge = tuple(sorted(e))
-        if edge not in covered_edges:
-            uncovered_edges.append(e)
-            
-    while uncovered_edges:
-        #スコアテーブル初期化(各ノードが何本の未被覆辺に接続しているか)
-        scores = [0] * len(individual)
-
-        #各未被覆辺について、両端のノードにスコアを加算
-        for u, v in uncovered_edges:
-            if individual[node.index(u)] == 0:
-                scores[node.index(u)] += 1
-            else: #デバッグ用
-                st.write(f"error")
-            if individual[node.index(v)] == 0:
-                scores[node.index(v)] += 1
-            else: #デバッグ用
-                st.write(f"error")
-
-        #最もスコアの高いノード(最も多くの未被覆辺に接している)を追加
-        max_idx = scores.index(max(scores))
-        individual[max_idx] = 1  #individual にノードを追加（= 1 にする）
-
-        #新たに追加したノードがカバーする辺を covered_edges に追加
-        u = node[max_idx]
-        for v in G.neighbors(u):
-            covered_edges.add(tuple(sorted((u, v))))
-
-        #uncovered_edges を再更新
-        uncovered_edges = []
-        for e in G.edges():
-            if tuple(sorted(e)) not in covered_edges:
-                uncovered_edges.append(e)
-
-
 
 #-----------------------------------------------------------------------------#
 populations = randomPopulation(nodeNum, popSize) #初期個体群の生成
 bestFitnessHistory = []
 
 for gen in range(gengeration):
-  
-  
     fitnessList=[]
     for list in populations:
       fitnessList.append(mainFitness(list)) #適応度評価
@@ -150,64 +98,26 @@ for gen in range(gengeration):
     for i in range(popSize//4):
         child1, child2 = pointCrossover(evaluatedPopulationList)
         nextGeneration.append(child1)
-        nextGeneration.append(child2) #交差による個体生成。20%の個体を生成
+        nextGeneration.append(child2)#交差による個体生成。20%の個体を生成
 
     nextGeneration.extend(randomPopulation(nodeNum, popSize-len(nextGeneration))) #ランダムに残りの個体を生成(大体70%くらい)
     
     populations = nextGeneration.copy()
 
 
+st.write(bestFitnessHistory) #最良適応度
 
 
+fitness_values = [entry[0] for entry in bestFitnessHistory]
 
+fig = go.Figure(data=go.Scatter(
+    y=fitness_values,
+    mode='lines',
+    name='Best Fitness'
+))
+fig.update_layout(
+    xaxis_title='Generation',
+    yaxis_title='Fitness'
+)
 
-
-
-# x_nodes = [pos[i][0] for i in G.nodes()]
-# y_nodes = [pos[i][1] for i in G.nodes()]
-# node_color = [len(G.adj[node]) for node in G.nodes()]
-
-
-
-# edge_x = []
-# edge_y = []
-# for edge in G.edges():
-#     x0, y0 = pos[edge[0]]
-#     x1, y1 = pos[edge[1]]
-#     edge_x.extend([x0, x1, None])
-#     edge_y.extend([y0, y1, None])
-
-# fig = go.Figure()
-
-# fig.add_trace(go.Scatter(
-#   x=edge_x, y=edge_y,
-#   line=dict(width=0.2, color="black")))
-
-# fig.add_trace(go.Scatter(
-#     x=x_nodes, y=y_nodes,
-#     mode='markers',
-#     hoverinfo='text',
-#     text=[f"ノード番号: {node}<br>次数: {G.degree[node]}" for node in G.nodes()], 
-#     marker=dict(
-#         showscale=True,
-#         colorscale="Viridis",
-#         reversescale=True,
-#         color=node_color,
-#         size=10,
-#         colorbar=dict(
-#             thickness=15,
-#             title=dict(
-#               text='Node Connections',
-#               side='right'
-#             ),
-#             xanchor='left',
-#         ),
-#         line_width=2)))
-
-# fig.update_layout(
-#   height=700,
-#   showlegend=False,
-#   )
-
-# with st.container(border=True):
-#   st.plotly_chart(fig)
+st.plotly_chart(fig)

@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import plotly.graph_objects as go
 from modules.algorithm import kenchoXY
 
 page = st.sidebar.selectbox(
@@ -12,7 +13,7 @@ page = st.sidebar.selectbox(
 
 if page == "グラフのデータセット":
 
-    section = st.sidebar.radio("使用したグラフの一覧", ["駿河台地区のある一部のグラフ", "日本地図のグラフ"])
+    section = st.sidebar.radio("使用したグラフの一覧", ["駿河台地区のある一部のグラフ", "日本地図のグラフ", "G_setのグラフ"])
     
     if section == "駿河台地区のある一部のグラフ":
         with st.container(border = True):
@@ -141,3 +142,62 @@ if page == "グラフのデータセット":
                 file_name="admatrix.csv",
                 mime="text/csv"
             )
+            
+    elif section == "G_setのグラフ":
+      file_path = "assets/csv/G_set1.csv"
+      df = pd.read_csv(file_path, skiprows=3)
+
+      G = nx.from_pandas_edgelist(df, source="from", target="to", edge_attr="weight")
+      pos = nx.spring_layout(G, k=0.1, seed=7)
+
+
+      
+      x_nodes = [pos[i][0] for i in G.nodes()]
+      y_nodes = [pos[i][1] for i in G.nodes()]
+      node_color = [len(G.adj[node]) for node in G.nodes()]
+
+
+
+      edge_x = []
+      edge_y = []
+      for edge in G.edges():
+          x0, y0 = pos[edge[0]]
+          x1, y1 = pos[edge[1]]
+          edge_x.extend([x0, x1, None])
+          edge_y.extend([y0, y1, None])
+
+      fig = go.Figure()
+
+      fig.add_trace(go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=0.2, color="black")))
+
+      fig.add_trace(go.Scatter(
+          x=x_nodes, y=y_nodes,
+          mode='markers',
+          hoverinfo='text',
+          text=[f"ノード番号: {node}<br>次数: {G.degree[node]}" for node in G.nodes()], 
+          marker=dict(
+              showscale=True,
+              colorscale="Viridis",
+              reversescale=True,
+              color=node_color,
+              size=10,
+              colorbar=dict(
+                  thickness=15,
+                  title=dict(
+                    text='Node Connections',
+                    side='right'
+                  ),
+                  xanchor='left',
+              ),
+              line_width=2)))
+
+      fig.update_layout(
+        height=700,
+        showlegend=False,
+        )
+
+      with st.container(border=True):
+        st.subheader("G_setのデータ", divider="orange")
+        st.plotly_chart(fig)
