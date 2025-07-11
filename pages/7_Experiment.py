@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import random
 import networkx as nx
+import time
 import plotly.graph_objects as go
 
 file_path = "assets/csv/G_set1.csv"
@@ -11,21 +12,47 @@ df = pd.read_csv(file_path, skiprows=3)
 G = nx.from_pandas_edgelist(df, source="from", target="to", edge_attr="weight")
 pos = nx.spring_layout(G, k=0.1, seed=7)
 
-st.write(list(G.nodes()))
 
 #各種設定
 nodeNum = len(G.nodes()) #ノード数=遺伝子数
 popSize = 100 #個体数
-gengeration = 100 #世代数
-mutationRate = 0 #突然変異率
+gengeration = 3000 #世代数
+mutationRate = 0.1 #突然変異率
 
-#初期個体群の生成(ランダムx100体)
-def randomPopulation(nodeNum, popSize):
+progress_text = "Operation in progress. Please wait."
+my_bar = st.progress(0, text=progress_text)
+
+node = list(G.nodes())
+node_index = {u: i for i, u in enumerate(node)}
+all_edges = list(G.edges())
+neighbors = {u: list(G.neighbors(u)) for u in G.nodes()}
+
+
+#初期個体群の生成(完全ランダムx100体)
+def per50randomPopulation(nodeNum, popSize):
   Population = []
   for i in range(popSize):
     individual = [random.randint(0,1) for i in range(nodeNum)]
-    Population.append(individual)
+    corrected = greedyCorrection(individual, node, node_index, all_edges, neighbors)
+    Population.append(corrected)
   return Population
+
+def per33randomPopulation(nodeNum, popSize):
+    Population = []
+    for _ in range(popSize):
+        base = [0] * nodeNum
+        individual = []
+        for bit in base:
+            if random.random() > 0.33:
+                individual.append(bit)
+            else:
+                individual.append(random.randint(0, 1))
+        corrected = greedyCorrection(individual, node, node_index, all_edges, neighbors)
+        Population.append(corrected)
+    return Population
+
+
+
 
 #適応度関数：個体内の1の数（例：頂点被覆サイズ）を最小化
 def mainFitness(population):
@@ -66,30 +93,32 @@ def pointCrossover(evaPopList):
     child2 = parent2[:point] + parent1[point:]
     
     #突然変異
-    if random.random() < mutationRate:
-        child1 = [1 - bit for bit in child1]
+    child1 = mutate_single_bit(child1, mutationRate)
+    child2 = mutate_single_bit(child2, mutationRate)
+    
+    child1 = greedyCorrection(child1, node, node_index, all_edges, neighbors)
+    child1 = greedyReduction(child1, G, node, node_index)
+    child2 = greedyCorrection(child2, node, node_index, all_edges, neighbors)
+    child2 = greedyReduction(child2, G, node, node_index)
 
-    if random.random() < mutationRate:
-        child2 = [1 - bit for bit in child2]
-        
+
     
     return child1, child2
 
-def greedyCorrection(individual, G): #individualは0と1のリストで表されている
+def greedyCorrection(individual, node, node_index, all_edges, neighbors):
     individual = individual.copy()
-    node = list(G.nodes())
     
     covered_edges = set()
     #現在カバーされている辺を covered_edges に入れる
     for i, bit in enumerate(individual):
         if bit == 1:
             u = node[i]
-            for v in G.neighbors(u):
+            for v in neighbors[u]:
                 covered_edges.add(tuple(sorted((u, v))))
 
     #カバーされていない辺を見つける
     uncovered_edges = []
-    for e in G.edges():
+    for e in all_edges:
         edge = tuple(sorted(e))
         if edge not in covered_edges:
             uncovered_edges.append(e)
@@ -100,14 +129,10 @@ def greedyCorrection(individual, G): #individualは0と1のリストで表され
 
         #各未被覆辺について、両端のノードにスコアを加算
         for u, v in uncovered_edges:
-            if individual[node.index(u)] == 0:
-                scores[node.index(u)] += 1
-            else: #デバッグ用
-                st.write(f"error")
-            if individual[node.index(v)] == 0:
-                scores[node.index(v)] += 1
-            else: #デバッグ用
-                st.write(f"error")
+            if individual[node_index[u]] == 0:
+                scores[node_index[u]] += 1
+            if individual[node_index[v]] == 0:
+                scores[node_index[v]] += 1
 
         #最もスコアの高いノード(最も多くの未被覆辺に接している)を追加
         max_idx = scores.index(max(scores))
@@ -115,27 +140,77 @@ def greedyCorrection(individual, G): #individualは0と1のリストで表され
 
         #新たに追加したノードがカバーする辺を covered_edges に追加
         u = node[max_idx]
-        for v in G.neighbors(u):
+        for v in neighbors[u]:
             covered_edges.add(tuple(sorted((u, v))))
 
         #uncovered_edges を再更新
         uncovered_edges = []
-        for e in G.edges():
+        for e in all_edges:
             if tuple(sorted(e)) not in covered_edges:
                 uncovered_edges.append(e)
+    return individual #修正された個体を返す
 
+def greedyReduction(individual, G, node, node_index):
+    individual = individual.copy()
+
+    #被覆に含まれる頂点のインデックスリストを作成
+    current_cover_indices = [i for i, bit in enumerate(individual) if bit == 1]
+
+    #次数が小さい順にソート
+    current_cover_indices.sort(key=lambda i: G.degree(node[i]))
+
+    for i in current_cover_indices:
+        v = node[i]
+        individual[i] = 0  #一旦削除
+
+        #この削除によってカバーされなくなる辺があるか
+        uncovered = [
+            (u, w) for u, w in G.edges(v)
+            if not (individual[node_index[u]] == 1 or individual[node_index[w]] == 1)
+        ]
+
+        if uncovered:
+            individual[i] = 1  #必須だったので戻す
+
+    return individual
+
+
+def mutate_single_bit(individual, mutationRate):
+    if random.random() < mutationRate:
+        idx_to_mutate = random.randint(0, len(individual) - 1)
+        individual[idx_to_mutate] = 1 - individual[idx_to_mutate]
+    return individual
+  
+def is_vertex_cover(individual, all_edges, node, node_index):
+    covered_edges = set()
+    for i, bit in enumerate(individual):
+        if bit == 1:
+            u = node[i]
+            for v in G.neighbors(u):
+                covered_edges.add(tuple(sorted((u, v))))
+
+    for u, v in all_edges:
+        if tuple(sorted((u, v))) not in covered_edges:
+            print(f"未カバーの辺: ({u}, {v})")
+            return False
+    return True
 
 
 #-----------------------------------------------------------------------------#
-populations = randomPopulation(nodeNum, popSize) #初期個体群の生成
+start_time = time.time()
+
+populations = per50randomPopulation(nodeNum, popSize) #初期個体群の生成
+# corrected_zero = greedyCorrection([0] * nodeNum, node, node_index, all_edges, neighbors)
+# populations.append(corrected_zero) #全て0の個体を追加
+
 bestFitnessHistory = []
 
 for gen in range(gengeration):
   
   
     fitnessList=[]
-    for list in populations:
-      fitnessList.append(mainFitness(list)) #適応度評価
+    for ind in populations:
+      fitnessList.append(mainFitness(ind)) #適応度評価
 
     evaluatedPopulationList = [[fit, ind] for fit, ind in zip(fitnessList, populations)] 
     evaluatedPopulationList.sort(reverse=False, key=lambda fitness:fitness[0]) #評価値と各個体値リストをソート
@@ -150,64 +225,54 @@ for gen in range(gengeration):
     for i in range(popSize//4):
         child1, child2 = pointCrossover(evaluatedPopulationList)
         nextGeneration.append(child1)
-        nextGeneration.append(child2) #交差による個体生成。20%の個体を生成
+        nextGeneration.append(child2) #交差による個体生成。50%の個体を生成
 
-    nextGeneration.extend(randomPopulation(nodeNum, popSize-len(nextGeneration))) #ランダムに残りの個体を生成(大体70%くらい)
+    nextGeneration.extend(per50randomPopulation(nodeNum, popSize-len(nextGeneration))) #ランダムに残りの個体を生成(大体70%くらい)
     
     populations = nextGeneration.copy()
 
+    elapsed_time = time.time() - start_time
+    avg_time_per_gen = elapsed_time / (gen + 1)
+    remaining_time = avg_time_per_gen * (gengeration - gen - 1)
+
+    minutes = int(remaining_time // 60)
+    seconds = int(remaining_time % 60)
+    time_text = f"残り推定時間: {minutes}分 {seconds}秒"
+
+    my_bar.progress((gen + 1) / gengeration, text=time_text)
 
 
 
 
+my_bar.empty()
 
 
 
-# x_nodes = [pos[i][0] for i in G.nodes()]
-# y_nodes = [pos[i][1] for i in G.nodes()]
-# node_color = [len(G.adj[node]) for node in G.nodes()]
+# テキストでも最良適応度を確認
+st.write(f"最良適応度（全世代）: {[entry[0] for entry in bestFitnessHistory]}")
+
+# グラフ表示
+fitness_values = [entry[0] for entry in bestFitnessHistory]
+
+fig = go.Figure(data=go.Scatter(
+    y=fitness_values,
+    mode='lines+markers',
+    name='Best Fitness'
+))
+fig.update_layout(
+    title='世代ごとの最良適応度の推移',
+    xaxis_title='世代',
+    yaxis_title='適応度（1の数）',
+    template='plotly_white'
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+
+#個体数100,世代数100
+#[642, 640, 636, 629, 628, 628, 628, 628, 628, 628, 628, 628, 628, 628, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 623, 623, 623, 623, 623, 623, 623, 615, 615, 615, 615, 615, 615, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614]
+#全て0のビット列を個体群の中に入れた
+#[599, 579, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 569, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567]
 
 
 
-# edge_x = []
-# edge_y = []
-# for edge in G.edges():
-#     x0, y0 = pos[edge[0]]
-#     x1, y1 = pos[edge[1]]
-#     edge_x.extend([x0, x1, None])
-#     edge_y.extend([y0, y1, None])
-
-# fig = go.Figure()
-
-# fig.add_trace(go.Scatter(
-#   x=edge_x, y=edge_y,
-#   line=dict(width=0.2, color="black")))
-
-# fig.add_trace(go.Scatter(
-#     x=x_nodes, y=y_nodes,
-#     mode='markers',
-#     hoverinfo='text',
-#     text=[f"ノード番号: {node}<br>次数: {G.degree[node]}" for node in G.nodes()], 
-#     marker=dict(
-#         showscale=True,
-#         colorscale="Viridis",
-#         reversescale=True,
-#         color=node_color,
-#         size=10,
-#         colorbar=dict(
-#             thickness=15,
-#             title=dict(
-#               text='Node Connections',
-#               side='right'
-#             ),
-#             xanchor='left',
-#         ),
-#         line_width=2)))
-
-# fig.update_layout(
-#   height=700,
-#   showlegend=False,
-#   )
-
-# with st.container(border=True):
-#   st.plotly_chart(fig)
