@@ -1,82 +1,70 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import random
 import networkx as nx
 import plotly.graph_objects as go
 
-file_path = "assets/csv/G_set1.csv"
-df = pd.read_csv(file_path, skiprows=3)
+st.set_page_config(page_title="Edge List Visualizer", layout="wide")
+st.title("Edge List Visualizer — source,target (CSV from file)")
+st.caption("同じディレクトリ内のCSVファイルを相対パスで読み込み、Plotlyでネットワークを可視化します。")
 
-G = nx.from_pandas_edgelist(df, source="from", target="to", edge_attr="weight")
-pos = nx.spring_layout(G, k=0.1, seed=7)
+# --- CSVファイルを相対パスで指定 ---
+file_path = "assets/csv/edges.csv"  # ← 後でここを変更してください
 
+# --- CSV読み込み ---
+try:
+    df = pd.read_csv(file_path)
+    st.success(f"CSVを読み込みました: {file_path}")
+except Exception as e:
+    st.error(f"CSVの読み込みに失敗しました: {e}")
+    st.stop()
 
-#各種設定
-nodeNum = len(G.nodes()) #ノード数=遺伝子数
-popSize = 100 #個体数
-gengeration = 100 #世代数
-mutationRate = 0.1 #突然変異率
+# --- 検証 ---
+if not {'source','target'}.issubset(df.columns):
+    st.error("CSVに'source'と'target'列が必要です。")
+    st.stop()
 
-progress_text = "Operation in progress. Please wait."
-my_bar = st.progress(0, text=progress_text)
+# --- グラフ構築 ---
+G = nx.Graph()
+for _, row in df.iterrows():
+    G.add_edge(row['source'], row['target'])
 
-node = list(G.nodes())
-node_index = {u: i for i, u in enumerate(node)}
-all_edges = list(G.edges())
-neighbors = {u: list(G.neighbors(u)) for u in G.nodes()}
+# --- レイアウト計算 ---
+pos = nx.spring_layout(G, seed=42)
 
-def greedyCorrection(individual, node, node_index, all_edges, neighbors):
-    individual = individual.copy()
-    node = list(G.nodes())
-    
-    covered_edges = set()
-    #現在カバーされている辺を covered_edges に入れる
-    for i, bit in enumerate(individual):
-        if bit == 1:
-            u = node[i]
-            for v in neighbors[u]:
-                covered_edges.add(tuple(sorted((u, v))))
+# --- Plotlyで描画 ---
+edge_x, edge_y = [], []
+for u, v in G.edges():
+    x0, y0 = pos[u]
+    x1, y1 = pos[v]
+    edge_x += [x0, x1, None]
+    edge_y += [y0, y1, None]
 
-    #カバーされていない辺を見つける
-    uncovered_edges = []
-    for e in all_edges:
-        edge = tuple(sorted(e))
-        if edge not in covered_edges:
-            uncovered_edges.append(e)
-            
-    while uncovered_edges:
-        #スコアテーブル初期化(各ノードが何本の未被覆辺に接続しているか)
-        scores = [0] * len(individual)
+edge_trace = go.Scatter(x=edge_x, y=edge_y, line=dict(width=1), mode='lines', hoverinfo='none')
 
-        #各未被覆辺について、両端のノードにスコアを加算
-        for u, v in uncovered_edges:
-            if individual[node_index[u]] == 0:
-                scores[node_index[u]] += 1
-            else: #デバッグ用
-                st.write(f"error")
-            if individual[node_index[v]] == 0:
-                scores[node_index[v]] += 1
-            else: #デバッグ用
-                st.write(f"error")
+node_x, node_y = [], []
+for node in G.nodes():
+    x, y = pos[node]
+    node_x.append(x)
+    node_y.append(y)
 
-        #最もスコアの高いノード(最も多くの未被覆辺に接している)を追加
-        max_idx = scores.index(max(scores))
-        individual[max_idx] = 1  #individual にノードを追加（= 1 にする）
+node_trace = go.Scatter(
+    x=node_x, y=node_y,
+    mode='markers+text',
+    text=[str(n) for n in G.nodes()],
+    textposition='top center',
+    marker=dict(size=12, line=dict(width=1)),
+)
 
-        #新たに追加したノードがカバーする辺を covered_edges に追加
-        u = node[max_idx]
-        for v in neighbors[u]:
-            covered_edges.add(tuple(sorted((u, v))))
+fig = go.Figure(data=[edge_trace, node_trace])
+fig.update_layout(
+    showlegend=False,
+    margin=dict(l=10, r=10, t=30, b=10),
+    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+    height=700,
+)
 
-        #uncovered_edges を再更新
-        uncovered_edges = []
-        for e in all_edges:
-            if tuple(sorted(e)) not in covered_edges:
-                uncovered_edges.append(e)
-    return individual #修正された個体を返す
+st.plotly_chart(fig, use_container_width=True)
 
-zeroindividual = [0] * nodeNum
-corrected = greedyCorrection(zeroindividual, node, node_index, all_edges, neighbors)
-st.write("修正後の個体:", corrected)
-st.write("修正後の頂点数:", sum(corrected))
+st.markdown("---")
+st.write(f"ノード数: {G.number_of_nodes()}  /  エッジ数: {G.number_of_edges()}")

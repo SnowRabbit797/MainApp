@@ -1,278 +1,284 @@
+# streamlit run app.py
 import streamlit as st
 import pandas as pd
-import numpy as np
 import random
 import networkx as nx
-import time
 import plotly.graph_objects as go
 
-file_path = "assets/csv/G_set1.csv"
-df = pd.read_csv(file_path, skiprows=3)
+# =========================
+# ページ設定
+# =========================
+st.set_page_config(page_title="GA for Minimum Vertex Cover", layout="wide")
+st.title("遺伝的アルゴリズムによる最小頂点被覆（MVC）")
 
-G = nx.from_pandas_edgelist(df, source="from", target="to", edge_attr="weight")
-pos = nx.spring_layout(G, k=0.1, seed=7)
+# =========================
+# ユーティリティ関数（GA本体）
+# =========================
+def build_graph(file_path):
+    df = pd.read_csv(file_path)
+    G = nx.from_pandas_edgelist(df, source="source", target="target", edge_attr=True)
+    node = list(G.nodes())
+    node_index = {u: i for i, u in enumerate(node)}
+    all_edges_set = {frozenset(e) for e in G.edges()}
+    neighbors = {u: list(G.neighbors(u)) for u in G.nodes()}
+    return G, node, node_index, all_edges_set, neighbors
 
-
-#各種設定
-nodeNum = len(G.nodes()) #ノード数=遺伝子数
-popSize = 100 #個体数
-gengeration = 3000 #世代数
-mutationRate = 0.1 #突然変異率
-
-progress_text = "Operation in progress. Please wait."
-my_bar = st.progress(0, text=progress_text)
-
-node = list(G.nodes())
-node_index = {u: i for i, u in enumerate(node)}
-all_edges = list(G.edges())
-neighbors = {u: list(G.neighbors(u)) for u in G.nodes()}
-
-
-#初期個体群の生成(完全ランダムx100体)
-def per50randomPopulation(nodeNum, popSize):
-  Population = []
-  for i in range(popSize):
-    individual = [random.randint(0,1) for i in range(nodeNum)]
-    corrected = greedyCorrection(individual, node, node_index, all_edges, neighbors)
-    Population.append(corrected)
-  return Population
-
-def per33randomPopulation(nodeNum, popSize):
-    Population = []
-    for _ in range(popSize):
-        base = [0] * nodeNum
-        individual = []
-        for bit in base:
-            if random.random() > 0.33:
-                individual.append(bit)
-            else:
-                individual.append(random.randint(0, 1))
-        corrected = greedyCorrection(individual, node, node_index, all_edges, neighbors)
-        Population.append(corrected)
-    return Population
-
-
-
-
-#適応度関数：個体内の1の数（例：頂点被覆サイズ）を最小化
-def mainFitness(population):
-  return sum(population)
-
-#ルーレット選択
-def rouletteSelect(evaPopList):
-    # 逆数型適応度の計算
-    converted = [1 / ((fit[0] + 1)**2) for fit in evaPopList]
-    totalConvertedFitness = sum(converted)
-
-    cumulative = []
-    cumSum = 0
-    for cf in converted:
-        cumSum += cf
-        cumulative.append(cumSum / totalConvertedFitness)
-
-    r = random.random()
-    for i, cum in enumerate(cumulative):
-        if r <= cum:
-            return i, evaPopList[i] #iは選択された個体のインデックス、evaPopList[i]は選択された個体の値[1,0,1,...]
-          
-
-#一点交叉
-def pointCrossover(evaPopList):
-    idx1, p1 = rouletteSelect(evaPopList)
-    
-    while True:
-        idx2, p2 = rouletteSelect(evaPopList)
-        if idx1 != idx2:
-            break
-    
-    parent1 = p1[1] #選択された個体の値
-    parent2 = p2[1] #選択された個体の値
-    
-    point = random.randint(1, nodeNum - 1)
-    child1 = parent1[:point] + parent2[point:]
-    child2 = parent2[:point] + parent1[point:]
-    
-    #突然変異
-    child1 = mutate_single_bit(child1, mutationRate)
-    child2 = mutate_single_bit(child2, mutationRate)
-    
-    child1 = greedyCorrection(child1, node, node_index, all_edges, neighbors)
-    child1 = greedyReduction(child1, G, node, node_index)
-    child2 = greedyCorrection(child2, node, node_index, all_edges, neighbors)
-    child2 = greedyReduction(child2, G, node, node_index)
-
-
-    
-    return child1, child2
-
-def greedyCorrection(individual, node, node_index, all_edges, neighbors):
+def greedyCorrection(individual, node, node_index, all_edges_set, neighbors):
     individual = individual.copy()
-    
-    covered_edges = set()
-    #現在カバーされている辺を covered_edges に入れる
+    uncovered = all_edges_set.copy()
     for i, bit in enumerate(individual):
         if bit == 1:
             u = node[i]
             for v in neighbors[u]:
-                covered_edges.add(tuple(sorted((u, v))))
+                uncovered.discard(frozenset((u, v)))
+    while uncovered:
+        scores = {}
+        for e in uncovered:
+            for u in e:
+                if individual[node_index[u]] == 0:
+                    scores[u] = scores.get(u, 0) + 1
+        if not scores:
+            break
+        best_u = max(scores, key=scores.get)
+        individual[node_index[best_u]] = 1
+        for v in neighbors[best_u]:
+            uncovered.discard(frozenset((best_u, v)))
+    return individual
 
-    #カバーされていない辺を見つける
-    uncovered_edges = []
-    for e in all_edges:
-        edge = tuple(sorted(e))
-        if edge not in covered_edges:
-            uncovered_edges.append(e)
-            
-    while uncovered_edges:
-        #スコアテーブル初期化(各ノードが何本の未被覆辺に接続しているか)
-        scores = [0] * len(individual)
-
-        #各未被覆辺について、両端のノードにスコアを加算
-        for u, v in uncovered_edges:
-            if individual[node_index[u]] == 0:
-                scores[node_index[u]] += 1
-            if individual[node_index[v]] == 0:
-                scores[node_index[v]] += 1
-
-        #最もスコアの高いノード(最も多くの未被覆辺に接している)を追加
-        max_idx = scores.index(max(scores))
-        individual[max_idx] = 1  #individual にノードを追加（= 1 にする）
-
-        #新たに追加したノードがカバーする辺を covered_edges に追加
-        u = node[max_idx]
-        for v in neighbors[u]:
-            covered_edges.add(tuple(sorted((u, v))))
-
-        #uncovered_edges を再更新
-        uncovered_edges = []
-        for e in all_edges:
-            if tuple(sorted(e)) not in covered_edges:
-                uncovered_edges.append(e)
-    return individual #修正された個体を返す
-
-def greedyReduction(individual, G, node, node_index):
+def greedyReduction(individual, node, node_index, neighbors):
     individual = individual.copy()
-
-    #被覆に含まれる頂点のインデックスリストを作成
-    current_cover_indices = [i for i, bit in enumerate(individual) if bit == 1]
-
-    #次数が小さい順にソート
-    current_cover_indices.sort(key=lambda i: G.degree(node[i]))
-
-    for i in current_cover_indices:
-        v = node[i]
-        individual[i] = 0  #一旦削除
-
-        #この削除によってカバーされなくなる辺があるか
-        uncovered = [
-            (u, w) for u, w in G.edges(v)
-            if not (individual[node_index[u]] == 1 or individual[node_index[w]] == 1)
-        ]
-
-        if uncovered:
-            individual[i] = 1  #必須だったので戻す
-
+    ones = [i for i, bit in enumerate(individual) if bit == 1]
+    random.shuffle(ones)
+    for i in ones:
+        individual[i] = 0
+        u = node[i]
+        valid = True
+        for v in neighbors[u]:
+            if individual[node_index[v]] == 0:
+                valid = False
+                break
+        if not valid:
+            individual[i] = 1
     return individual
 
+def fitness(genotype, node, node_index, all_edges_set, neighbors):
+    p = greedyCorrection(genotype, node, node_index, all_edges_set, neighbors)
+    p = greedyReduction(p, node, node_index, neighbors)
+    return sum(p)
 
-def mutate_single_bit(individual, mutationRate):
-    if random.random() < mutationRate:
-        idx_to_mutate = random.randint(0, len(individual) - 1)
-        individual[idx_to_mutate] = 1 - individual[idx_to_mutate]
-    return individual
-  
-def is_vertex_cover(individual, all_edges, node, node_index):
-    covered_edges = set()
-    for i, bit in enumerate(individual):
-        if bit == 1:
-            u = node[i]
-            for v in G.neighbors(u):
-                covered_edges.add(tuple(sorted((u, v))))
+def create_initial_population(n, size, node, node_index, all_edges_set, neighbors):
+    pop = []
+    super_ind = greedyCorrection([0]*n, node, node_index, all_edges_set, neighbors)
+    pop.append(super_ind)
+    for _ in range(size - 1):
+        p = random.choice([0.2, 0.3, 0.5])
+        ind = [1 if random.random() < p else 0 for _ in range(n)]
+        pop.append(ind)
+    return pop
 
-    for u, v in all_edges:
-        if tuple(sorted((u, v))) not in covered_edges:
-            print(f"未カバーの辺: ({u}, {v})")
-            return False
-    return True
+def roulette_select(evaluated):
+    scores = [1.0/((f+1.0)**2) for f, _ in evaluated]
+    ssum = sum(scores)
+    r = random.uniform(0, ssum)
+    acc = 0.0
+    for i, (_, g) in enumerate(evaluated):
+        acc += scores[i]
+        if acc >= r:
+            return g
+    return evaluated[-1][1]
 
+def tournament_select(evaluated, k=3):
+    cand = random.sample(evaluated, k)
+    cand.sort(key=lambda x: x[0])
+    return cand[0][1]
 
-#-----------------------------------------------------------------------------#
-start_time = time.time()
+def select_parent(evaluated, p_roulette=0.5, k=3):
+    return roulette_select(evaluated) if random.random() < p_roulette else tournament_select(evaluated, k)
 
-populations = per50randomPopulation(nodeNum, popSize) #初期個体群の生成
-# corrected_zero = greedyCorrection([0] * nodeNum, node, node_index, all_edges, neighbors)
-# populations.append(corrected_zero) #全て0の個体を追加
+def mutate(ind, rate):
+    for i in range(len(ind)):
+        if random.random() < rate:
+            ind[i] = 1 - ind[i]
+    return ind
 
-bestFitnessHistory = []
+def one_point_crossover(p1, p2, mut_rate):
+    L = len(p1)
+    c = random.randint(1, L-1)
+    c1 = p1[:c] + p2[c:]
+    c2 = p2[:c] + p1[c:]
+    return mutate(c1, mut_rate), mutate(c2, mut_rate)
 
-for gen in range(gengeration):
-  
-  
-    fitnessList=[]
-    for ind in populations:
-      fitnessList.append(mainFitness(ind)) #適応度評価
+def uniform_crossover(p1, p2, mut_rate):
+    c1, c2 = [], []
+    for a, b in zip(p1, p2):
+        if random.random() < 0.5:
+            c1.append(a); c2.append(b)
+        else:
+            c1.append(b); c2.append(a)
+    return mutate(c1, mut_rate), mutate(c2, mut_rate)
 
-    evaluatedPopulationList = [[fit, ind] for fit, ind in zip(fitnessList, populations)] 
-    evaluatedPopulationList.sort(reverse=False, key=lambda fitness:fitness[0]) #評価値と各個体値リストをソート
-    bestFitnessHistory.append(evaluatedPopulationList[0]) #最良適応度を記録
+def strong_perturbation(ind, rate, node, node_index, all_edges_set, neighbors):
+    new_ind = ind.copy()
+    flip = max(1, int(len(ind)*rate))
+    pos = random.sample(range(len(ind)), flip)
+    for p in pos:
+        new_ind[p] = 1 - new_ind[p]
+    new_ind = greedyCorrection(new_ind, node, node_index, all_edges_set, neighbors)
+    new_ind = greedyReduction(new_ind, node, node_index, neighbors)
+    return new_ind
 
-    elitePop = []
-    elitePop = [ind for fit, ind in evaluatedPopulationList[:popSize//10]] #エリート個体を10%選択)
+def run_ga(params, graph_ctx, use_strong, progress_label="最適化中..."):
+    (G, node, node_index, all_edges_set, neighbors) = graph_ctx
+    node_num = len(node)
+    pop_size = params["pop_size"]
+    generation = params["generation"]
+    mutation_rate = params["mutation_rate"]
+    elite_ratio = params["elite_ratio"]
+    tournament_k = params["tournament_k"]
+    p_roulette = params["p_roulette"]
+    cx_type = params["cx_type"]
+    stagnation_threshold = params["stagnation_threshold"]
+    sp_rate = params["sp_rate"]
+    sp_bottom_ratio = params["sp_bottom_ratio"]
 
-    nextGeneration = [] #次世代の個体群
-    nextGeneration = elitePop.copy() #エリート個体を10%残す
+    elite_size = max(1, int(pop_size * elite_ratio))
+    cx = one_point_crossover if cx_type == "一点交叉" else uniform_crossover
 
-    for i in range(popSize//4):
-        child1, child2 = pointCrossover(evaluatedPopulationList)
-        nextGeneration.append(child1)
-        nextGeneration.append(child2) #交差による個体生成。50%の個体を生成
+    genotypes = create_initial_population(node_num, pop_size, node, node_index, all_edges_set, neighbors)
+    best_hist, best_ever = [], (float('inf'), None)
+    no_improve = 0
+    bar = st.progress(0, text=progress_label)
 
-    nextGeneration.extend(per50randomPopulation(nodeNum, popSize-len(nextGeneration))) #ランダムに残りの個体を生成(大体70%くらい)
-    
-    populations = nextGeneration.copy()
+    for gen in range(generation):
+        evaluated = [(fitness(g, node, node_index, all_edges_set, neighbors), g) for g in genotypes]
+        evaluated.sort(key=lambda x: x[0])
+        cur_best_fit, cur_best_geno = evaluated[0]
 
-    elapsed_time = time.time() - start_time
-    avg_time_per_gen = elapsed_time / (gen + 1)
-    remaining_time = avg_time_per_gen * (gengeration - gen - 1)
+        best_hist.append(min(best_hist[-1], cur_best_fit) if best_hist else cur_best_fit)
 
-    minutes = int(remaining_time // 60)
-    seconds = int(remaining_time % 60)
-    time_text = f"残り推定時間: {minutes}分 {seconds}秒"
+        if cur_best_fit < best_ever[0]:
+            best_ever = (cur_best_fit, cur_best_geno)
+            no_improve = 0
+        else:
+            no_improve += 1
 
-    my_bar.progress((gen + 1) / gengeration, text=time_text)
+        # ---- 強い摂動（停滞時） ----
+        if use_strong and no_improve >= stagnation_threshold:
+            split = max(1, int(pop_size * (1.0 - sp_bottom_ratio)))
+            elites_keep = [g for _, g in evaluated[:split]]
+            bottoms = [g for _, g in evaluated[split:]]
+            perturbed = [strong_perturbation(g, sp_rate, node, node_index, all_edges_set, neighbors) for g in bottoms]
+            genotypes = elites_keep + perturbed
+            no_improve = 0
+            bar.progress((gen+1)/generation, text=f"{progress_label}｜強い摂動を適用（gen={gen+1}）")
+            continue
 
+        # ---- 次世代生成 ----
+        next_gen = [g for _, g in evaluated[:elite_size]]  # エリート保存
+        while len(next_gen) < pop_size:
+            p1 = select_parent(evaluated, p_roulette=p_roulette, k=tournament_k)
+            p2 = select_parent(evaluated, p_roulette=p_roulette, k=tournament_k)
+            c1, c2 = cx(p1, p2, mutation_rate)
+            next_gen.append(c1)
+            if len(next_gen) < pop_size:
+                next_gen.append(c2)
+        genotypes = next_gen
 
+        bar.progress((gen+1)/generation, text=f"{progress_label}｜現在の最良={cur_best_fit}")
 
+    bar.empty()
+    return best_hist, best_ever
 
-my_bar.empty()
+# =========================
+# サイドバー（フォーム + 実行ボタン）
+# =========================
+with st.sidebar:
+    st.header("パラメータ設定")
+    with st.form("params_form", clear_on_submit=False):
+        file_path = st.text_input("エッジリストCSV", "assets/csv/G_set1_small.csv")
+        pop_size = st.number_input("集団サイズ", 10, 5000, 50, 10)
+        generation = st.number_input("世代数", 10, 20000, 500, 10)
+        mutation_rate = st.slider("突然変異率", 0.0, 1.0, 0.10, 0.01)
+        elite_ratio = st.slider("エリート率", 0.0, 0.5, 0.05, 0.01)
+        seed = st.number_input("乱数シード（任意）", min_value=0, max_value=10**9, value=0, step=1)
 
+        st.markdown("---")
+        use_sp = st.checkbox("強い摂動を使う", value=True)
+        stagnation_threshold = st.number_input("停滞閾値（連続非改善世代）", 1, 5000, 20, 1)
+        sp_rate = st.slider("摂動の反転割合", 0.01, 0.9, 0.2, 0.01)
+        sp_bottom_ratio = st.slider("摂動対象（下位割合）", 0.1, 0.9, 0.5, 0.05)
 
+        st.markdown("---")
+        cx_type = st.radio("交叉法", ["一点交叉", "一様交叉"], index=0, horizontal=True)
+        tournament_k = st.number_input("トーナメントサイズ k", 2, 50, 3, 1)
+        p_roulette = st.slider("親選択：ルーレットの比率", 0.0, 1.0, 0.5, 0.05)
 
-# テキストでも最良適応度を確認
-st.write(f"最良適応度（全世代）: {[entry[0] for entry in bestFitnessHistory]}")
+        submitted = st.form_submit_button("実行")
 
-# グラフ表示
-fitness_values = [entry[0] for entry in bestFitnessHistory]
+# =========================
+# 実行・結果の保持と表示
+# =========================
+if submitted:
+    # 乱数シード（0は固定しない。0でない時のみ固定）
+    if seed != 0:
+        random.seed(seed)
 
-fig = go.Figure(data=go.Scatter(
-    y=fitness_values,
-    mode='lines+markers',
-    name='Best Fitness'
-))
-fig.update_layout(
-    title='世代ごとの最良適応度の推移',
-    xaxis_title='世代',
-    yaxis_title='適応度（1の数）',
-    template='plotly_white'
-)
+    try:
+        graph_ctx = build_graph(file_path)
+    except Exception as e:
+        st.error(f"CSVの読み込みに失敗しました: {e}")
+        st.stop()
 
-st.plotly_chart(fig, use_container_width=True)
+    params = dict(
+        pop_size=pop_size,
+        generation=int(generation),
+        mutation_rate=float(mutation_rate),
+        elite_ratio=float(elite_ratio),
+        tournament_k=int(tournament_k),
+        p_roulette=float(p_roulette),
+        cx_type=cx_type,
+        stagnation_threshold=int(stagnation_threshold),
+        sp_rate=float(sp_rate),
+        sp_bottom_ratio=float(sp_bottom_ratio),
+    )
 
+    # 実行（GAのみ / GA+強い摂動）
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("GAのみ")
+        hist_ga, best_ga = run_ga(params, graph_ctx, use_strong=False, progress_label="GAのみ")
+        st.write(f"最終最良: **{best_ga[0]}**")
 
-#個体数100,世代数100
-#[642, 640, 636, 629, 628, 628, 628, 628, 628, 628, 628, 628, 628, 628, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 627, 623, 623, 623, 623, 623, 623, 623, 615, 615, 615, 615, 615, 615, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614, 614]
-#全て0のビット列を個体群の中に入れた
-#[599, 579, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 572, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 571, 569, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567, 567]
+    with col2:
+        st.subheader("GA + 強い摂動")
+        hist_sp, best_sp = run_ga(params, graph_ctx, use_strong=use_sp, progress_label="GA+強い摂動")
+        st.write(f"最終最良: **{best_sp[0]}**")
 
+    # 結果をセッションに保存（パラメータも一緒に）
+    st.session_state["last_params"] = params
+    st.session_state["hist_ga"] = hist_ga
+    st.session_state["best_ga"] = best_ga
+    st.session_state["hist_sp"] = hist_sp
+    st.session_state["best_sp"] = best_sp
 
+# 直近の結果表示（実行後にスライダーを動かしても残る）
+if "hist_ga" in st.session_state and "hist_sp" in st.session_state:
+    hist_ga = st.session_state["hist_ga"]
+    hist_sp = st.session_state["hist_sp"]
+    best_ga = st.session_state["best_ga"]
+    best_sp = st.session_state["best_sp"]
 
+    st.markdown("### 学習履歴（累積最良）")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(y=hist_ga, mode='lines', name='GAのみ'))
+    fig.add_trace(go.Scatter(y=hist_sp, mode='lines', name='GA+強い摂動'))
+    fig.update_layout(xaxis_title='generation', yaxis_title='best fitness', template='plotly_white')
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 世代スナップショット
+    gen_list = [100, 200, 300, 400, 500]
+    for g in gen_list:
+        if g <= len(hist_ga):
+            st.write(f"{g}世代: GAのみ={hist_ga[g-1]}, GA+強い摂動={hist_sp[g-1]}")
+else:
+    st.info("左のサイドバーでパラメータを設定し、**実行**ボタンを押してください。")

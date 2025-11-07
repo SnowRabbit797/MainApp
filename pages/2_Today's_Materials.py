@@ -6,8 +6,10 @@ from modules.zemi import z20250425
 from modules.zemi import z20250523
 from modules.zemi import z20250613
 from modules.zemi import z20250711
+from modules.zemi import z20251017
+from modules.zemi import z20251107
 
-z20250711.main()
+z20251107.main()
 
 
 
