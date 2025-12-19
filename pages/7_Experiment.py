@@ -1,284 +1,260 @@
-# streamlit run app.py
-import streamlit as st
-import pandas as pd
-import random
-import networkx as nx
-import plotly.graph_objects as go
+# # demo_compare_anyxy.py
+# # streamlit run demo_compare_anyxy.py
 
-# =========================
-# ページ設定
-# =========================
-st.set_page_config(page_title="GA for Minimum Vertex Cover", layout="wide")
-st.title("遺伝的アルゴリズムによる最小頂点被覆（MVC）")
+# import streamlit as st
+# import plotly.graph_objects as go
 
-# =========================
-# ユーティリティ関数（GA本体）
-# =========================
-def build_graph(file_path):
-    df = pd.read_csv(file_path)
-    G = nx.from_pandas_edgelist(df, source="source", target="target", edge_attr=True)
-    node = list(G.nodes())
-    node_index = {u: i for i, u in enumerate(node)}
-    all_edges_set = {frozenset(e) for e in G.edges()}
-    neighbors = {u: list(G.neighbors(u)) for u in G.nodes()}
-    return G, node, node_index, all_edges_set, neighbors
+# st.set_page_config(page_title="Comparison Plot (Any X-Y)", layout="wide")
+# st.title("比較グラフ（任意X-Y点列・系列可変）")
 
-def greedyCorrection(individual, node, node_index, all_edges_set, neighbors):
-    individual = individual.copy()
-    uncovered = all_edges_set.copy()
-    for i, bit in enumerate(individual):
-        if bit == 1:
-            u = node[i]
-            for v in neighbors[u]:
-                uncovered.discard(frozenset((u, v)))
-    while uncovered:
-        scores = {}
-        for e in uncovered:
-            for u in e:
-                if individual[node_index[u]] == 0:
-                    scores[u] = scores.get(u, 0) + 1
-        if not scores:
-            break
-        best_u = max(scores, key=scores.get)
-        individual[node_index[best_u]] = 1
-        for v in neighbors[best_u]:
-            uncovered.discard(frozenset((best_u, v)))
-    return individual
+# # --------------------------
+# # Helpers
+# # --------------------------
 
-def greedyReduction(individual, node, node_index, neighbors):
-    individual = individual.copy()
-    ones = [i for i, bit in enumerate(individual) if bit == 1]
-    random.shuffle(ones)
-    for i in ones:
-        individual[i] = 0
-        u = node[i]
-        valid = True
-        for v in neighbors[u]:
-            if individual[node_index[v]] == 0:
-                valid = False
-                break
-        if not valid:
-            individual[i] = 1
-    return individual
+# def parse_points(s: str):
+#     """
+#     "0:227, 1:226, 3:225" -> [(0.0,227.0),(1.0,226.0),(3.0,225.0)]
+#     形式は "x:y" をカンマ区切り
+#     - パース不能は無視
+#     - x昇順にソート
+#     - x重複は後勝ち
+#     """
+#     pts = []
+#     for chunk in s.split(","):
+#         chunk = chunk.strip()
+#         if not chunk or ":" not in chunk:
+#             continue
+#         xs, ys = chunk.split(":", 1)
+#         try:
+#             x = float(xs.strip())
+#             y = float(ys.strip())
+#         except ValueError:
+#             continue
+#         pts.append((x, y))
 
-def fitness(genotype, node, node_index, all_edges_set, neighbors):
-    p = greedyCorrection(genotype, node, node_index, all_edges_set, neighbors)
-    p = greedyReduction(p, node, node_index, neighbors)
-    return sum(p)
+#     if not pts:
+#         return []
 
-def create_initial_population(n, size, node, node_index, all_edges_set, neighbors):
-    pop = []
-    super_ind = greedyCorrection([0]*n, node, node_index, all_edges_set, neighbors)
-    pop.append(super_ind)
-    for _ in range(size - 1):
-        p = random.choice([0.2, 0.3, 0.5])
-        ind = [1 if random.random() < p else 0 for _ in range(n)]
-        pop.append(ind)
-    return pop
+#     pts.sort(key=lambda t: t[0])
 
-def roulette_select(evaluated):
-    scores = [1.0/((f+1.0)**2) for f, _ in evaluated]
-    ssum = sum(scores)
-    r = random.uniform(0, ssum)
-    acc = 0.0
-    for i, (_, g) in enumerate(evaluated):
-        acc += scores[i]
-        if acc >= r:
-            return g
-    return evaluated[-1][1]
+#     merged = []
+#     for x, y in pts:
+#         if merged and merged[-1][0] == x:
+#             merged[-1] = (x, y)
+#         else:
+#             merged.append((x, y))
+#     return merged
 
-def tournament_select(evaluated, k=3):
-    cand = random.sample(evaluated, k)
-    cand.sort(key=lambda x: x[0])
-    return cand[0][1]
 
-def select_parent(evaluated, p_roulette=0.5, k=3):
-    return roulette_select(evaluated) if random.random() < p_roulette else tournament_select(evaluated, k)
+# def step_curve_from_points(pts):
+#     """
+#     段差表示（piecewise-constant）にするための点列を作る。
+#     pts = [(x1,y1),(x2,y2),...] のとき、
+#     x1..x2間はy1を保持、x2以降はy2…みたいに見せる。
+#     Plotlyの線で段差っぽくするために、
+#     (x2, y1) を挟む形の点列にする。
+#     """
+#     if len(pts) <= 1:
+#         return [p[0] for p in pts], [p[1] for p in pts]
 
-def mutate(ind, rate):
-    for i in range(len(ind)):
-        if random.random() < rate:
-            ind[i] = 1 - ind[i]
-    return ind
+#     xs, ys = [pts[0][0]], [pts[0][1]]
+#     for i in range(1, len(pts)):
+#         x_prev, y_prev = pts[i-1]
+#         x_now,  y_now  = pts[i]
+#         # 段差の横線終端
+#         xs.append(x_now)
+#         ys.append(y_prev)
+#         # 段差の縦落ち（同じxで次のy）
+#         xs.append(x_now)
+#         ys.append(y_now)
+#     return xs, ys
 
-def one_point_crossover(p1, p2, mut_rate):
-    L = len(p1)
-    c = random.randint(1, L-1)
-    c1 = p1[:c] + p2[c:]
-    c2 = p2[:c] + p1[c:]
-    return mutate(c1, mut_rate), mutate(c2, mut_rate)
 
-def uniform_crossover(p1, p2, mut_rate):
-    c1, c2 = [], []
-    for a, b in zip(p1, p2):
-        if random.random() < 0.5:
-            c1.append(a); c2.append(b)
-        else:
-            c1.append(b); c2.append(a)
-    return mutate(c1, mut_rate), mutate(c2, mut_rate)
+# # --------------------------
+# # session_state defaults
+# # --------------------------
 
-def strong_perturbation(ind, rate, node, node_index, all_edges_set, neighbors):
-    new_ind = ind.copy()
-    flip = max(1, int(len(ind)*rate))
-    pos = random.sample(range(len(ind)), flip)
-    for p in pos:
-        new_ind[p] = 1 - new_ind[p]
-    new_ind = greedyCorrection(new_ind, node, node_index, all_edges_set, neighbors)
-    new_ind = greedyReduction(new_ind, node, node_index, neighbors)
-    return new_ind
+# def ensure_defaults():
+#     if "axis" not in st.session_state:
+#         st.session_state["axis"] = {
+#             "x_title": "計算ステップ（例：世代 / 時間 / 実験回数 / データサイズ）",
+#             "y_title": "評価値（例：頂点被覆サイズ / 目的関数値）",
+#         }
 
-def run_ga(params, graph_ctx, use_strong, progress_label="最適化中..."):
-    (G, node, node_index, all_edges_set, neighbors) = graph_ctx
-    node_num = len(node)
-    pop_size = params["pop_size"]
-    generation = params["generation"]
-    mutation_rate = params["mutation_rate"]
-    elite_ratio = params["elite_ratio"]
-    tournament_k = params["tournament_k"]
-    p_roulette = params["p_roulette"]
-    cx_type = params["cx_type"]
-    stagnation_threshold = params["stagnation_threshold"]
-    sp_rate = params["sp_rate"]
-    sp_bottom_ratio = params["sp_bottom_ratio"]
+#     if "series" not in st.session_state:
+#         st.session_state["series"] = [
+#             {
+#                 "name": "Normal_GA",
+#                 "desc": "通常GAの推移（例：ステップ:評価値）",
+#                 "points": "1:227, 2:226, 3:225, 5:224, 7:223, 10:222, 13:221, 19:220, 20:219, 141:218",
+#                 "style": "line_step",  # line_linear / line_step / markers
+#             },
+#             {
+#                 "name": "Strong_Perturbation_GA",
+#                 "desc": "強い摂動付きGAの推移（例：摂動で段階的に落ちる）",
+#                 "points": "1:227, 3:226, 4:225, 6:224, 7:223, 11:222, 12:221, 17:220, 33:219, 44:218, 66:217, 106:215, 146:214, 150:213, 170:212",
+#                 "style": "line_step",
+#             },
+#             {
+#                 "name": "ILP (PuLP/CBC) Optimal",
+#                 "desc": "線形/整数計画法の解（単一点 or 水平線で表示）",
+#                 "points": "0:179",
+#                 "style": "hline",  # hline / line_linear / line_step / markers
+#             },
+#         ]
 
-    elite_size = max(1, int(pop_size * elite_ratio))
-    cx = one_point_crossover if cx_type == "一点交叉" else uniform_crossover
+# ensure_defaults()
 
-    genotypes = create_initial_population(node_num, pop_size, node, node_index, all_edges_set, neighbors)
-    best_hist, best_ever = [], (float('inf'), None)
-    no_improve = 0
-    bar = st.progress(0, text=progress_label)
+# # --------------------------
+# # Axis UI
+# # --------------------------
 
-    for gen in range(generation):
-        evaluated = [(fitness(g, node, node_index, all_edges_set, neighbors), g) for g in genotypes]
-        evaluated.sort(key=lambda x: x[0])
-        cur_best_fit, cur_best_geno = evaluated[0]
+# with st.container(border=True):
+#     st.subheader("軸ラベル（自由に指定）")
+#     c1, c2 = st.columns(2)
+#     with c1:
+#         st.session_state["axis"]["x_title"] = st.text_input("x軸は何を指す？", value=st.session_state["axis"]["x_title"])
+#     with c2:
+#         st.session_state["axis"]["y_title"] = st.text_input("y軸は何を指す？", value=st.session_state["axis"]["y_title"])
 
-        best_hist.append(min(best_hist[-1], cur_best_fit) if best_hist else cur_best_fit)
+# # --------------------------
+# # Series controls
+# # --------------------------
 
-        if cur_best_fit < best_ever[0]:
-            best_ever = (cur_best_fit, cur_best_geno)
-            no_improve = 0
-        else:
-            no_improve += 1
+# with st.container(border=True):
+#     st.subheader("系列（グラフ）の追加・削除")
 
-        # ---- 強い摂動（停滞時） ----
-        if use_strong and no_improve >= stagnation_threshold:
-            split = max(1, int(pop_size * (1.0 - sp_bottom_ratio)))
-            elites_keep = [g for _, g in evaluated[:split]]
-            bottoms = [g for _, g in evaluated[split:]]
-            perturbed = [strong_perturbation(g, sp_rate, node, node_index, all_edges_set, neighbors) for g in bottoms]
-            genotypes = elites_keep + perturbed
-            no_improve = 0
-            bar.progress((gen+1)/generation, text=f"{progress_label}｜強い摂動を適用（gen={gen+1}）")
-            continue
+#     col_add, col_del, col_reset = st.columns([1, 1, 1])
+#     with col_add:
+#         if st.button("＋ 系列を追加"):
+#             st.session_state["series"].append(
+#                 {
+#                     "name": f"Series_{len(st.session_state['series'])+1}",
+#                     "desc": "",
+#                     "points": "0:0, 1:0",
+#                     "style": "line_linear",
+#                 }
+#             )
+#             st.rerun()
 
-        # ---- 次世代生成 ----
-        next_gen = [g for _, g in evaluated[:elite_size]]  # エリート保存
-        while len(next_gen) < pop_size:
-            p1 = select_parent(evaluated, p_roulette=p_roulette, k=tournament_k)
-            p2 = select_parent(evaluated, p_roulette=p_roulette, k=tournament_k)
-            c1, c2 = cx(p1, p2, mutation_rate)
-            next_gen.append(c1)
-            if len(next_gen) < pop_size:
-                next_gen.append(c2)
-        genotypes = next_gen
+#     with col_del:
+#         if st.session_state["series"]:
+#             del_idx = st.number_input(
+#                 "削除する系列番号（1〜）",
+#                 min_value=1,
+#                 max_value=len(st.session_state["series"]),
+#                 value=len(st.session_state["series"]),
+#                 step=1,
+#             )
+#             if st.button("－ 指定番号の系列を削除"):
+#                 st.session_state["series"].pop(int(del_idx) - 1)
+#                 st.rerun()
+#         else:
+#             st.info("系列がありません。追加してください。")
 
-        bar.progress((gen+1)/generation, text=f"{progress_label}｜現在の最良={cur_best_fit}")
+#     with col_reset:
+#         if st.button("初期状態に戻す"):
+#             for k in ["series", "axis"]:
+#                 if k in st.session_state:
+#                     del st.session_state[k]
+#             ensure_defaults()
+#             st.rerun()
 
-    bar.empty()
-    return best_hist, best_ever
+# # --------------------------
+# # Series editors
+# # --------------------------
 
-# =========================
-# サイドバー（フォーム + 実行ボタン）
-# =========================
-with st.sidebar:
-    st.header("パラメータ設定")
-    with st.form("params_form", clear_on_submit=False):
-        file_path = st.text_input("エッジリストCSV", "assets/csv/G_set1_small.csv")
-        pop_size = st.number_input("集団サイズ", 10, 5000, 50, 10)
-        generation = st.number_input("世代数", 10, 20000, 500, 10)
-        mutation_rate = st.slider("突然変異率", 0.0, 1.0, 0.10, 0.01)
-        elite_ratio = st.slider("エリート率", 0.0, 0.5, 0.05, 0.01)
-        seed = st.number_input("乱数シード（任意）", min_value=0, max_value=10**9, value=0, step=1)
+# st.markdown("### 各系列の情報（名前・説明・点列・表示方法）")
 
-        st.markdown("---")
-        use_sp = st.checkbox("強い摂動を使う", value=True)
-        stagnation_threshold = st.number_input("停滞閾値（連続非改善世代）", 1, 5000, 20, 1)
-        sp_rate = st.slider("摂動の反転割合", 0.01, 0.9, 0.2, 0.01)
-        sp_bottom_ratio = st.slider("摂動対象（下位割合）", 0.1, 0.9, 0.5, 0.05)
+# style_labels = {
+#     "line_linear": "折れ線（線形）",
+#     "line_step": "段差（キー点を保持する感じ）",
+#     "markers": "点のみ（散布図）",
+#     "hline": "水平線（ILP/LPの最良値を基準線表示）",
+# }
 
-        st.markdown("---")
-        cx_type = st.radio("交叉法", ["一点交叉", "一様交叉"], index=0, horizontal=True)
-        tournament_k = st.number_input("トーナメントサイズ k", 2, 50, 3, 1)
-        p_roulette = st.slider("親選択：ルーレットの比率", 0.0, 1.0, 0.5, 0.05)
+# for i, ser in enumerate(st.session_state["series"]):
+#     with st.container(border=True):
+#         st.markdown(f"#### 系列 {i+1}")
 
-        submitted = st.form_submit_button("実行")
+#         c1, c2 = st.columns([1, 2])
+#         with c1:
+#             ser["name"] = st.text_input("表示名", value=ser["name"], key=f"name_{i}")
+#             ser["style"] = st.selectbox(
+#                 "表示方法",
+#                 options=list(style_labels.keys()),
+#                 format_func=lambda k: style_labels[k],
+#                 index=list(style_labels.keys()).index(ser.get("style", "line_linear")),
+#                 key=f"style_{i}",
+#             )
+#         with c2:
+#             ser["desc"] = st.text_area("この系列が指すもの（説明）", value=ser["desc"], height=70, key=f"desc_{i}")
+#             ser["points"] = st.text_area(
+#                 "点列（形式: x:y をカンマ区切り）",
+#                 value=ser["points"],
+#                 height=90,
+#                 help="例: 0:227, 1:226, 3:225",
+#                 key=f"pts_{i}",
+#             )
 
-# =========================
-# 実行・結果の保持と表示
-# =========================
-if submitted:
-    # 乱数シード（0は固定しない。0でない時のみ固定）
-    if seed != 0:
-        random.seed(seed)
+# run_btn = st.button("グラフ生成", type="primary")
 
-    try:
-        graph_ctx = build_graph(file_path)
-    except Exception as e:
-        st.error(f"CSVの読み込みに失敗しました: {e}")
-        st.stop()
+# # --------------------------
+# # Plot
+# # --------------------------
 
-    params = dict(
-        pop_size=pop_size,
-        generation=int(generation),
-        mutation_rate=float(mutation_rate),
-        elite_ratio=float(elite_ratio),
-        tournament_k=int(tournament_k),
-        p_roulette=float(p_roulette),
-        cx_type=cx_type,
-        stagnation_threshold=int(stagnation_threshold),
-        sp_rate=float(sp_rate),
-        sp_bottom_ratio=float(sp_bottom_ratio),
-    )
+# if run_btn:
+#     if not st.session_state["series"]:
+#         st.error("系列が0本です。1本以上追加してください。")
+#         st.stop()
 
-    # 実行（GAのみ / GA+強い摂動）
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("GAのみ")
-        hist_ga, best_ga = run_ga(params, graph_ctx, use_strong=False, progress_label="GAのみ")
-        st.write(f"最終最良: **{best_ga[0]}**")
+#     fig = go.Figure()
+#     used_points = []
 
-    with col2:
-        st.subheader("GA + 強い摂動")
-        hist_sp, best_sp = run_ga(params, graph_ctx, use_strong=use_sp, progress_label="GA+強い摂動")
-        st.write(f"最終最良: **{best_sp[0]}**")
+#     for ser in st.session_state["series"]:
+#         pts = parse_points(ser["points"])
+#         used_points.append((ser["name"], pts))
 
-    # 結果をセッションに保存（パラメータも一緒に）
-    st.session_state["last_params"] = params
-    st.session_state["hist_ga"] = hist_ga
-    st.session_state["best_ga"] = best_ga
-    st.session_state["hist_sp"] = hist_sp
-    st.session_state["best_sp"] = best_sp
+#         if not pts:
+#             # 点が無い系列はスキップ（入力ミス対策）
+#             continue
 
-# 直近の結果表示（実行後にスライダーを動かしても残る）
-if "hist_ga" in st.session_state and "hist_sp" in st.session_state:
-    hist_ga = st.session_state["hist_ga"]
-    hist_sp = st.session_state["hist_sp"]
-    best_ga = st.session_state["best_ga"]
-    best_sp = st.session_state["best_sp"]
+#         style = ser.get("style", "line_linear")
 
-    st.markdown("### 学習履歴（累積最良）")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(y=hist_ga, mode='lines', name='GAのみ'))
-    fig.add_trace(go.Scatter(y=hist_sp, mode='lines', name='GA+強い摂動'))
-    fig.update_layout(xaxis_title='generation', yaxis_title='best fitness', template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+#         # 水平線（ILP/LPの最終値比較向け）
+#         if style == "hline":
+#             # 最初の点のyを使う（例: 0:179）
+#             y0 = pts[0][1]
+#             fig.add_hline(y=y0, line_dash="dot", annotation_text=ser["name"], annotation_position="top left")
+#             continue
 
-    # 世代スナップショット
-    gen_list = [100, 200, 300, 400, 500]
-    for g in gen_list:
-        if g <= len(hist_ga):
-            st.write(f"{g}世代: GAのみ={hist_ga[g-1]}, GA+強い摂動={hist_sp[g-1]}")
-else:
-    st.info("左のサイドバーでパラメータを設定し、**実行**ボタンを押してください。")
+#         if style == "line_step":
+#             xs, ys = step_curve_from_points(pts)
+#             fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", name=ser["name"]))
+#         elif style == "markers":
+#             fig.add_trace(go.Scatter(x=[p[0] for p in pts], y=[p[1] for p in pts], mode="markers", name=ser["name"]))
+#         else:  # line_linear
+#             fig.add_trace(go.Scatter(x=[p[0] for p in pts], y=[p[1] for p in pts], mode="lines", name=ser["name"]))
+
+#     fig.update_layout(
+#         xaxis_title=st.session_state["axis"]["x_title"],
+#         yaxis_title=st.session_state["axis"]["y_title"],
+#         template="plotly_white",
+#         legend_title_text="Series",
+#     )
+
+#     st.subheader("比較グラフ")
+#     st.plotly_chart(fig, use_container_width=True, key="cmp_anyxy")
+
+#     st.markdown("### 各系列の説明（何を指すか）")
+#     for ser in st.session_state["series"]:
+#         with st.container(border=True):
+#             st.markdown(f"**{ser['name']}**")
+#             st.write(ser["desc"] if ser["desc"].strip() else "（説明なし）")
+
+#     st.markdown("### 実際に使われた点列（整形後）")
+#     for name, pts in used_points:
+#         st.write(f"{name}:", pts)
+
+# else:
+#     st.info("軸ラベルと各系列の点列を入力して「グラフ生成」を押してください。")

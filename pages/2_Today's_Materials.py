@@ -8,8 +8,9 @@ from modules.zemi import z20250613
 from modules.zemi import z20250711
 from modules.zemi import z20251017
 from modules.zemi import z20251107
+from modules.zemi import z20251219
 
-z20251107.main()
+z20251219.main()
 
 
 

@@ -157,11 +157,11 @@ def draw_step(ax, G, pos, snapshot, seeds, title=""):
         node_colors.append("#cbd5e1" if pid == 0 else palette[(pid-1) % len(palette)])
 
     nx.draw_networkx_edges(G, pos, edge_color="#94a3b8", width=1.2, alpha=0.85, ax=ax)
-    nx.draw_networkx_nodes(G, pos, node_size=420, node_color=node_colors,
+    nx.draw_networkx_nodes(G, pos, node_size=200, node_color=node_colors,
                            edgecolors="#1f2937", linewidths=1.2, ax=ax)
     labels = {v: f"{v}\n(P{find_part(snapshot, v) or '?'} )" for v in G.nodes()}
-    nx.draw_networkx_labels(G, pos, labels=labels, font_size=6, ax=ax)
-    nx.draw_networkx_nodes(G, pos, nodelist=list(seeds), node_size=420,
+    nx.draw_networkx_labels(G, pos, labels=labels, font_size=3, ax=ax)
+    nx.draw_networkx_nodes(G, pos, nodelist=list(seeds), node_size=40,
                            node_color="none", edgecolors="#111827", linewidths=2.2, ax=ax)
     ax.set_title(title, fontsize=12, pad=6)
     ax.axis("off")

@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 # =========================
 # ★ ここだけ差し替えればOK（source,target想定）
 # =========================
-DATA_PATH = "assets/csv/G_set1.csv"
+DATA_PATH = "assets/csv/G2.csv"
 
 # ---- ページ設定 ----
 st.set_page_config(page_title="MVC-GA: Uniform+Roulette / auto-m / logs+viz", layout="wide")
@@ -106,45 +106,91 @@ def auto_num_parts(n_nodes: int) -> int:
     return max(2, round((n_nodes ** 0.6) / 3))
 
 def bfs_block_division(G: nx.Graph, m: int, seed: int = 1):
+    # 必要ライブラリがインポートされていない場合を考慮して内部記述
+    # (外部で import 済なら削除可)
+    from collections import deque
+    
     rng = random.Random(seed)
     nodes = list(G.nodes())
     n = len(nodes)
     m = max(2, min(int(m), n))
-    base, rem = n // m, n % m
-    caps = {pid: (base + 1 if pid <= rem else base) for pid in range(1, m + 1)}
-    remaining = set(nodes)
+    
+    # --- 変更点1: シード選定 ---
+    # ランダムではなく「次数が高い順」に上位m個をシードとする
+    # (同率次数の場合の順序固定のため、一度ソートしてから選ぶと安定します)
+    nodes_sorted = sorted(nodes, key=lambda x: G.degree[x], reverse=True)
+    seeds = nodes_sorted[:m]
+
+    # --- 変数初期化 ---
+    # 各パーティションのノードリスト
     parts = {pid: [] for pid in range(1, m + 1)}
+    # 各パーティションの探索キュー
+    queues = {}
+    # ノードの所属記録 (visited兼用)
+    node_to_pid = {}
 
-    for pid in range(1, m + 1):
-        if not remaining:
-            break
-        start = rng.choice(list(remaining))
-        q = [start]; seen = {start}
-        block = [start]; remaining.remove(start)
-        while q and len(block) < caps[pid]:
-            u = q.pop(0)
+    # シードを初期配置
+    for i, s in enumerate(seeds):
+        pid = i + 1
+        parts[pid].append(s)
+        node_to_pid[s] = pid
+        queues[pid] = deque([s])
+
+    # --- 変更点2: 並行BFS (上限なし) ---
+    # ラウンドロビンで各ブロックを少しずつ拡張する
+    active_pids = list(range(1, m + 1))
+    
+    while active_pids:
+        # 拡張順序をシャッフルして公平にする (乱数seed使用)
+        rng.shuffle(active_pids)
+        next_active = []
+        
+        for pid in active_pids:
+            q = queues[pid]
+            
+            # キューが空なら拡張終了
+            if not q:
+                continue
+            
+            # 1ステップ拡張 (キューから1つ取り出し、その隣接を取る)
+            u = q.popleft()
+            
+            # 隣接ノードを探索
+            has_neighbors_in_queue = False
             for v in G.neighbors(u):
-                if v in remaining and v not in seen:
-                    seen.add(v); block.append(v); remaining.remove(v); q.append(v)
-                    if len(block) >= caps[pid]:
-                        break
-        parts[pid] = block
+                if v not in node_to_pid:
+                    node_to_pid[v] = pid
+                    parts[pid].append(v)
+                    q.append(v)
+                
+            # まだキューに残っているなら次ラウンドも継続
+            if q:
+                next_active.append(pid)
+        
+        active_pids = next_active
 
-    for v in list(remaining):
-        smallest = min(parts, key=lambda k: len(parts[k]))
-        parts[smallest].append(v)
+    # --- 変更点3: 残余ノード処理 (非連結成分対策) ---
+    # 基本的にここで remaining は空のはずだが、非連結グラフの場合のみ発生する
+    remaining = [v for v in nodes if v not in node_to_pid]
+    for v in remaining:
+        # 隣接するパーティションを探す
+        adj_pids = set()
+        for nbr in G.neighbors(v):
+            if nbr in node_to_pid:
+                adj_pids.add(node_to_pid[nbr])
+        
+        if adj_pids:
+            # 隣接している中で最小のパーティションへ結合
+            target = min(adj_pids, key=lambda pid: len(parts[pid]))
+        else:
+            # 完全孤立なら全体最小へ
+            target = min(parts, key=lambda pid: len(parts[pid]))
+            
+        parts[target].append(v)
+        node_to_pid[v] = target
 
     return {pid: sorted(ns) for pid, ns in parts.items()}
 
-def make_superchild(population, parts):
-    """各パートで “1が最少” の個体の部分を採用して結合"""
-    n = len(population[0])
-    child = [0] * n
-    for _, nodes in sorted(parts.items()):
-        best = min(population, key=lambda ind: sum(ind[i] for i in nodes))
-        for i in nodes:
-            child[i] = best[i]
-    return child
 
 # ---- 選択・交叉・突然変異 ----
 def roulette_select(pop_eval, rng=None):
@@ -178,81 +224,174 @@ def mutate(ind, rate=0.05, rng=None):
     return out
 
 # ========= メインGA（改善ログ & 可視化用情報も返す）=========
+# ========= 強い摂動（Kick）用の関数 =========
+def apply_kick(ind, G, strength=0.15, rng=None):
+    """
+    現在 '1' になっているノードを strength の割合で強制的に '0' にする。
+    これにより、Greedy修復時に「別のノード」でのカバーを強制する。
+    """
+    rng = rng or random
+    kicked = ind[:]
+    
+    # 現在 1 のインデックスを取得
+    ones = [i for i, x in enumerate(kicked) if x == 1]
+    if not ones:
+        return kicked
+    
+    # 破壊する個数を決定
+    num_to_remove = int(len(ones) * strength)
+    if num_to_remove == 0:
+        num_to_remove = 1
+        
+    # ランダムに選んで 0 にする
+    targets = rng.sample(ones, num_to_remove)
+    for t in targets:
+        kicked[t] = 0
+        
+    return kicked
+
+# ========= メインGA（停滞検知 & Kick実装版）=========
 def run_ga(G, pop_size, generations, mutation_rate, seed):
     start_time = time.time()
     rng = random.Random(seed) if seed is not None else random
     n = G.number_of_nodes()
-    rand_inject = max(0, int(round(0.20 * pop_size)))  # 20% ランダム注入
 
-    # 初期集団 → 全体Greedy補正
+    # パラメータ
+    stagnation_limit = 30   # 何世代更新がなければKickするか
+    kick_strength = 0.20    # 現在の解をどれくらい破壊するか(20%)
+
+    # 配分
+    num_elite = int(pop_size * 0.30)
+    num_ga    = int(pop_size * 0.50)
+
+    # 初期化
     population = init_population_random(n, size=pop_size, seed=seed)
     population = [greedy_correction(ind, G) for ind in population]
-
-    # m自動 → BFS分割固定
     m_parts = auto_num_parts(n)
     parts = bfs_block_division(G, m=m_parts, seed=seed)
+    best_local_genes = {pid: (float('inf'), []) for pid in parts}
 
     best_hist = []
     best_so_far = None
-    improvements = []  # (gen, best_value) を記録
+    improvements = []
+    
+    # 停滞カウンタ
+    last_improve_gen = 0
+    
     bar = st.progress(0.0, text=f"準備中… m={m_parts}")
 
     for gen in range(1, generations + 1):
-        evaluated = [(fitness_size(ind), ind) for ind in population]
+        # 評価 & アーカイブ更新
+        evaluated = []
+        for ind in population:
+            fit = fitness_size(ind)
+            evaluated.append((fit, ind))
+            for pid, nodes in parts.items():
+                local_score = sum(ind[i] for i in nodes)
+                if local_score < best_local_genes[pid][0]:
+                    best_local_genes[pid] = (local_score, [ind[i] for i in nodes])
+
         evaluated.sort(key=lambda x: x[0])
         curr_best_fit, curr_best_ind = evaluated[0]
 
-        # 累積最良・改善ログ
+        # ベスト更新判定
         if best_so_far is None or curr_best_fit < best_so_far:
             best_so_far = curr_best_fit
             improvements.append((gen, best_so_far))
+            last_improve_gen = gen  # 更新があった世代を記録
+        
         best_hist.append(best_so_far)
+        
+        # 停滞判定
+        stagnation_count = gen - last_improve_gen
+        is_stagnant = (stagnation_count >= stagnation_limit)
 
-        # 次世代種：エリート + superchild
-        elite = curr_best_ind
-        next_pop = [elite]
+        next_pop = []
 
-        superchild = make_superchild([ind for _, ind in evaluated], parts)
-        superchild = greedy_correction(superchild, G)
-        superchild = light_prune_all_neighbors_one(superchild, G)  # ★膨張抑制
-        next_pop.append(superchild)
+        # ==========================================
+        # ★ 停滞モード (Kick発動)
+        # ==========================================
+        if is_stagnant:
+            # メッセージ表示（デバッグ用、あるいはStreamlitに進捗表示させても良い）
+            # st.write(f"Gen {gen}: Stagnation detected! KICK applied.") 
+            
+            # カウンタを少し戻す（連続Kickを防ぐため、または連続させるため調整）
+            # ここでは「リセット」して、また30世代様子を見る
+            last_improve_gen = gen 
+            
+            # 戦略：
+            # 1. エリートは1体だけ残す（保険）
+            next_pop.append(curr_best_ind)
+            
+            # 2. 残りの大部分を「エリートを破壊(Kick)して修復したもの」で埋め尽くす
+            # これにより、集団全体を強制的に「新しい谷」へ移動させる
+            kick_base = curr_best_ind
+            
+            while len(next_pop) < pop_size:
+                # 破壊
+                kicked = apply_kick(kick_base, G, strength=kick_strength, rng=rng)
+                # 修復（ここで構造が変わる）
+                repaired = greedy_correction(kicked, G)
+                repaired = light_prune_all_neighbors_one(repaired, G)
+                next_pop.append(repaired)
 
-        # GA子（ルーレット×一様×突然変異）
-        while len(next_pop) < pop_size - rand_inject:
-            p1 = roulette_select(evaluated, rng=rng)
-            p2 = roulette_select(evaluated, rng=rng)
-            c1, c2 = uniform_crossover(p1, p2, rng=rng)
-            c1 = mutate(c1, rate=mutation_rate, rng=rng)
-            next_pop.append(c1)
-            if len(next_pop) < pop_size - rand_inject:
-                c2 = mutate(c2, rate=mutation_rate, rng=rng)
-                next_pop.append(c2)
+        # ==========================================
+        # ★ 通常モード
+        # ==========================================
+        else:
+            # 1. Superchild
+            superchild = [0] * n
+            for pid, nodes in parts.items():
+                genes = best_local_genes[pid][1]
+                if not genes: genes = [0] * len(nodes)
+                for k, node_idx in enumerate(nodes):
+                    superchild[node_idx] = genes[k]
+            superchild = greedy_correction(superchild, G)
+            superchild = light_prune_all_neighbors_one(superchild, G)
+            next_pop.append(superchild)
 
-        # ランダム注入
-        while len(next_pop) < pop_size:
-            p = rng.choice((0.15, 0.25, 0.40))
-            rnd = [1 if rng.random() < p else 0 for _ in range(n)]
-            next_pop.append(rnd)
+            # 2. Elite
+            for i in range(num_elite):
+                if i < len(evaluated):
+                    next_pop.append(evaluated[i][1])
 
-        # 次世代整合性（Greedy）＋超軽量削減
+            # 3. GA
+            target = len(next_pop) + num_ga
+            while len(next_pop) < target:
+                p1 = roulette_select(evaluated, rng=rng)
+                p2 = roulette_select(evaluated, rng=rng)
+                c1, c2 = uniform_crossover(p1, p2, rng=rng)
+                c1 = mutate(c1, rate=mutation_rate, rng=rng)
+                next_pop.append(c1)
+                if len(next_pop) < target:
+                    c2 = mutate(c2, rate=mutation_rate, rng=rng)
+                    next_pop.append(c2)
+
+            # 4. Random
+            while len(next_pop) < pop_size:
+                p = rng.choice((0.15, 0.25, 0.40))
+                rnd = [1 if rng.random() < p else 0 for _ in range(n)]
+                next_pop.append(rnd)
+
+        # 共通：次世代の整合性確保
         population = [greedy_correction(ind, G) for ind in next_pop]
         population = [light_prune_all_neighbors_one(ind, G) for ind in population]
 
-        bar.progress(gen / generations, text=f"実行中… gen={gen}/{generations} / m={m_parts}")
+        status_text = "【KICK発動中💥】" if is_stagnant else f"通常モード (停滞: {stagnation_count})"
+        bar.progress(gen / generations, text=f"実行中… gen={gen} | Best={best_so_far} | {status_text}")
 
     bar.empty()
     evaluated = [(fitness_size(ind), ind) for ind in population]
     evaluated.sort(key=lambda x: x[0])
-    end_time = time.time()
-    elapsed = end_time - start_time
+    
     return {
         "best_fit": evaluated[0][0],
         "best_ind": evaluated[0][1],
         "hist": best_hist,
         "parts": parts,
         "m": m_parts,
-        "improvements": improvements, 
-        "elapsed": elapsed, # 世代ごとの改善ログ
+        "improvements": improvements,
+        "elapsed": time.time() - start_time,
     }
 
 # ========= サブグラフ可視化 =========
