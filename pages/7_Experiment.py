@@ -258,3 +258,7 @@
 
 # else:
 #     st.info("軸ラベルと各系列の点列を入力して「グラフ生成」を押してください。")
+
+import streamlit as st
+import networkx as nx
+st.write("networkx version:", nx.__version__)
