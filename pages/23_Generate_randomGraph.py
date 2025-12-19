@@ -6,8 +6,6 @@ import io
 import random
 from itertools import combinations
 
-# ★ networkx 3.x 対応：random_tree はここから
-from networkx.generators.trees import random_tree
 
 st.set_page_config(page_title="ランダムグラフ生成（Plotly・孤立点なし）", layout="wide")
 with st.container(border=False):
@@ -18,16 +16,24 @@ with st.container(border=False):
 # ----------------------------------
 def generate_graph_without_isolates(n: int, p: float, seed: int = 42) -> nx.Graph:
     """
-    1. ランダムな木（random_tree）で必ず連結なグラフを作る
-    2. まだ存在しない辺を確率 p で追加
-    → 必ず孤立点なし（連結）
+    networkx 3.x 完全対応版
+    1. ランダムな「鎖」で必ず連結にする
+    2. 残りの辺を確率 p で追加
+    → 必ず孤立点なし
     """
     rng = random.Random(seed)
+    G = nx.Graph()
 
-    # ランダムな木（ノードは 0..n-1）
-    G = random_tree(n, seed=seed)
+    # ノード追加
+    G.add_nodes_from(range(n))
 
-    # 木に存在しないノードペアに対して確率 p で辺を追加
+    # --- Step 1: 必ず連結になる骨格を作る（ランダムチェーン） ---
+    nodes = list(range(n))
+    rng.shuffle(nodes)
+    for i in range(n - 1):
+        G.add_edge(nodes[i], nodes[i + 1])
+
+    # --- Step 2: 追加のランダムエッジ ---
     existing_edges = set(map(frozenset, G.edges()))
     for u, v in combinations(range(n), 2):
         if frozenset((u, v)) in existing_edges:
@@ -36,6 +42,7 @@ def generate_graph_without_isolates(n: int, p: float, seed: int = 42) -> nx.Grap
             G.add_edge(u, v)
 
     return G
+
 
 # ----------------------------------
 # 3カラムレイアウト
