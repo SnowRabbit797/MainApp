@@ -758,7 +758,7 @@ def main():
 
             st.markdown(
                 f"""
-                - **Optimal solution found**
+                - Optimal solution found
                 - Enumerated nodes: {lp_result['nodes']}
                 - Total iterations: {lp_result['iterations']:,}
                 - 解は 厳密最適解
@@ -876,7 +876,7 @@ def main():
         # LP 結果
         # =========================
         with st.container(border=True):
-            st.subheader("② 線形計画法（LP / PuLP + CBC）の結果")
+            st.subheader("② 線形計画法(LP)の結果")
 
             # 相対Gapの計算
             gap_rel = (
