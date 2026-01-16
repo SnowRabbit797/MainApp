@@ -761,7 +761,7 @@ def main():
             # 2. 結果メトリクス表示
             # ==========================================
             with st.container(border=True):
-                st.subheader("📊 実験結果")
+                st.subheader("実験結果")
                 col1, col2, col3 = st.columns(3)
                 col1.metric("最良解 (Cut Size)", f"{best_val}")
                 col2.metric("到達世代", f"{best_gen} gen")
@@ -773,7 +773,7 @@ def main():
             # 3. グラフ描画
             # ==========================================
             with st.container(border=True):
-                st.subheader("📈 探索推移グラフ")
+                st.subheader("探索推移グラフ")
                 
                 # データ展開
                 x_vals = [x[0] for x in ga_history_kick]
