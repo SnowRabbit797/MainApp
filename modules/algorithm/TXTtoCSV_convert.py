@@ -4,7 +4,7 @@ import os
 # =============================
 # Streamlit でもズレない相対パス
 # =============================
-TXT_REL_PATH = "assets/csv/G15.txt"   # app.py から見た相対パスで書く
+TXT_REL_PATH = "assets/csv/G81.txt"   # app.py から見た相対パスで書く
 
 
 def convert_txt_to_csv(relative_path: str):

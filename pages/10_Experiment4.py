@@ -102,6 +102,7 @@ def init_population_random(n, size=50, ps=(0.15, 0.25, 0.40), seed=None):
 def fitness_size(ind):  # 小さいほど良い
     return sum(ind)
 
+#サブグラフ分割の自動mの算出
 def auto_num_parts(n_nodes: int) -> int:
     return max(2, round((n_nodes ** 0.6) / 3))
 
